@@ -11,6 +11,9 @@ importers:
 
   .:
     dependencies:
+      '@aws-sdk/dsql-signer':
+        specifier: ^3.1113.0
+        version: 3.1113.0
       '@aws-sdk/rds-signer':
         specifier: ^3.1113.0
         version: 3.1113.0
@@ -142,6 +145,10 @@ packages:
 
   '@aws-sdk/credential-providers@3.1113.0':
     resolution: {integrity: sha512-cbX7to3ZN2/H1vFMpMMCJclp+cu+ZEYo6VVL2OwFlSn0nSzkj1o+wNKk6ShO9vh4eCucdYOg4Em22kBeBuwK6g==}
+    engines: {node: '>=20.0.0'}
+
+  '@aws-sdk/dsql-signer@3.1113.0':
+    resolution: {integrity: sha512-AVcJ3rl7dcHU+G6oNlLCCSz/mJ58aXsfdVkltIpBK51d58Zylt5bgva9IGToTjdfQWq+cojgJFX45TLgpOBPyw==}
     engines: {node: '>=20.0.0'}
 
   '@aws-sdk/nested-clients@3.997.43':
@@ -2734,6 +2741,15 @@ snapshots:
       '@aws-sdk/types': 3.974.4
       '@smithy/core': 3.33.2
       '@smithy/credential-provider-imds': 4.5.2
+      '@smithy/types': 4.17.2
+      tslib: 2.8.1
+
+  '@aws-sdk/dsql-signer@3.1113.0':
+    dependencies:
+      '@aws-sdk/core': 3.977.8
+      '@aws-sdk/credential-provider-node': 3.972.80
+      '@smithy/core': 3.33.2
+      '@smithy/signature-v4': 5.7.2
       '@smithy/types': 4.17.2
       tslib: 2.8.1
 

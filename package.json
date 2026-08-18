@@ -8,6 +8,7 @@
     "start": "next start"
   },
   "dependencies": {
+    "@aws-sdk/dsql-signer": "^3.1113.0",
     "@aws-sdk/rds-signer": "^3.1113.0",
     "@base-ui/react": "^1.5.0",
     "@vercel/analytics": "1.6.1",
