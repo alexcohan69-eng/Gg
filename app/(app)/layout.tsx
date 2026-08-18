@@ -2,6 +2,7 @@ import { redirect } from "next/navigation"
 import { headers } from "next/headers"
 import { auth } from "@/lib/auth"
 import { AppShell } from "@/components/app-shell"
+import { getUnreadNotificationCount } from "@/lib/notifications"
 
 export default async function AppLayout({
   children,
@@ -14,6 +15,10 @@ export default async function AppLayout({
     redirect("/sign-in")
   }
 
+  const unreadNotifications = await getUnreadNotificationCount(
+    session.user.id,
+  )
+
   return (
     <AppShell
       user={{
@@ -22,6 +27,7 @@ export default async function AppLayout({
         image: session.user.image,
         username: (session.user as { username?: string | null }).username,
       }}
+      initialUnreadNotifications={unreadNotifications}
     >
       {children}
     </AppShell>

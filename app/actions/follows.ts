@@ -6,6 +6,7 @@ import { and, eq } from "drizzle-orm"
 import { auth } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { follows } from "@/lib/db/schema"
+import { createFollowNotification } from "@/lib/notifications"
 
 async function getUserId() {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -45,7 +46,7 @@ export async function followUser(
       return { success: false, error: "You can't follow yourself." }
     }
 
-    await db
+    const inserted = await db
       .insert(follows)
       .values({
         id: crypto.randomUUID(),
@@ -53,6 +54,17 @@ export async function followUser(
         followingId: targetUserId,
       })
       .onConflictDoNothing()
+      .returning({ id: follows.id })
+
+    // Only notify on an actual new follow edge — a duplicate follow
+    // request (e.g. a retried click) no-ops above and shouldn't
+    // resurface an already-read notification.
+    if (inserted.length > 0) {
+      await createFollowNotification({
+        recipientId: targetUserId,
+        actorId: userId,
+      })
+    }
 
     revalidateFollowPaths(profileIdentifier)
     return { success: true }

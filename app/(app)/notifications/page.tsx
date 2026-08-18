@@ -1,36 +1,25 @@
 import type { Metadata } from "next"
+import { headers } from "next/headers"
+import { redirect } from "next/navigation"
+import { auth } from "@/lib/auth"
+import { getNotifications } from "@/lib/notifications"
 import { PageHeader } from "@/components/page-header"
-import {
-  Empty,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-  EmptyDescription,
-} from "@/components/ui/empty"
-import { BellIcon } from "lucide-react"
+import { NotificationList } from "@/components/notification-list"
 
 export const metadata: Metadata = {
   title: "Notifications",
 }
 
-export default function NotificationsPage() {
+export default async function NotificationsPage() {
+  const session = await auth.api.getSession({ headers: await headers() })
+  if (!session?.user) redirect("/sign-in")
+
+  const notifications = await getNotifications(session.user.id)
+
   return (
     <div className="flex flex-col">
       <PageHeader title="Notifications" />
-      <div className="p-4">
-        <Empty>
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <BellIcon />
-            </EmptyMedia>
-            <EmptyTitle>No notifications yet</EmptyTitle>
-            <EmptyDescription>
-              Likes, replies, and new followers will show up here once the
-              notification system ships.
-            </EmptyDescription>
-          </EmptyHeader>
-        </Empty>
-      </div>
+      <NotificationList initialNotifications={notifications} />
     </div>
   )
 }

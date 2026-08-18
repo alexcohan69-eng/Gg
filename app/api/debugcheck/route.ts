@@ -12,7 +12,20 @@ export async function GET() {
   const tables = await db.execute(sql`
     select table_name from information_schema.tables where table_schema='public' order by table_name
   `)
-  return Response.json({ notificationsColumns: cols.rows, tables: tables.rows })
+  const constraints = await db.execute(sql`
+    select tc.table_name, tc.constraint_name, tc.constraint_type, kcu.column_name
+    from information_schema.table_constraints tc
+    join information_schema.key_column_usage kcu
+      on tc.constraint_name = kcu.constraint_name
+    where tc.table_schema = 'public'
+      and tc.table_name in ('follows','likes','reposts','bookmarks','notifications')
+    order by tc.table_name, tc.constraint_name
+  `)
+  return Response.json({
+    notificationsColumns: cols.rows,
+    tables: tables.rows,
+    constraints: constraints.rows,
+  })
 }
 
 export async function POST(req: Request) {

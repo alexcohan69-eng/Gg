@@ -18,6 +18,8 @@ import {
 import { NAV_ITEMS, MOBILE_TAB_ITEMS } from "@/lib/nav-items"
 import { authClient } from "@/lib/auth-client"
 import { cn } from "@/lib/utils"
+import { useUnreadNotificationCount } from "@/hooks/use-notifications"
+import { Badge } from "@/components/ui/badge"
 
 type ShellUser = {
   name: string
@@ -39,16 +41,24 @@ function isActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`)
 }
 
+function formatBadgeCount(count: number) {
+  return count > 99 ? "99+" : String(count)
+}
+
 export function AppShell({
   user,
+  initialUnreadNotifications = 0,
   children,
 }: {
   user: ShellUser
+  /** Server-rendered unread count, used as the SWR seed so the badge never flashes to 0. */
+  initialUnreadNotifications?: number
   children: React.ReactNode
 }) {
   const pathname = usePathname()
   const router = useRouter()
   const [sheetOpen, setSheetOpen] = useState(false)
+  const { unreadCount } = useUnreadNotificationCount(initialUnreadNotifications)
 
   async function handleSignOut() {
     await authClient.signOut()
@@ -68,6 +78,8 @@ export function AppShell({
           <nav aria-label="Primary" className="mt-2 flex flex-col gap-1">
             {NAV_ITEMS.map((item) => {
               const active = isActive(pathname, item.href)
+              const badgeCount =
+                item.href === "/notifications" ? unreadCount : 0
               return (
                 <Link
                   key={item.href}
@@ -78,8 +90,22 @@ export function AppShell({
                     active && "bg-accent text-accent-foreground font-semibold",
                   )}
                 >
-                  <item.icon className="size-6 shrink-0" aria-hidden="true" />
-                  <span className="hidden lg:inline">{item.label}</span>
+                  <span className="relative shrink-0">
+                    <item.icon className="size-6" aria-hidden="true" />
+                    {badgeCount > 0 ? (
+                      <Badge className="absolute -right-2 -top-2 h-4 min-w-4 px-1 text-[10px] lg:hidden">
+                        {formatBadgeCount(badgeCount)}
+                      </Badge>
+                    ) : null}
+                  </span>
+                  <span className="hidden flex-1 items-center gap-2 lg:flex">
+                    {item.label}
+                    {badgeCount > 0 ? (
+                      <Badge className="h-5 px-1.5 text-[11px]">
+                        {formatBadgeCount(badgeCount)}
+                      </Badge>
+                    ) : null}
+                  </span>
                 </Link>
               )
             })}
@@ -109,6 +135,8 @@ export function AppShell({
                 <nav aria-label="Primary" className="flex flex-col gap-1">
                   {NAV_ITEMS.map((item) => {
                     const active = isActive(pathname, item.href)
+                    const badgeCount =
+                      item.href === "/notifications" ? unreadCount : 0
                     return (
                       <Link
                         key={item.href}
@@ -122,7 +150,14 @@ export function AppShell({
                         )}
                       >
                         <item.icon className="size-6 shrink-0" aria-hidden="true" />
-                        {item.label}
+                        <span className="flex flex-1 items-center gap-2">
+                          {item.label}
+                          {badgeCount > 0 ? (
+                            <Badge className="h-5 px-1.5 text-[11px]">
+                              {formatBadgeCount(badgeCount)}
+                            </Badge>
+                          ) : null}
+                        </span>
                       </Link>
                     )
                   })}
@@ -161,18 +196,29 @@ export function AppShell({
         >
           {MOBILE_TAB_ITEMS.map((item) => {
             const active = isActive(pathname, item.href)
+            const badgeCount =
+              item.href === "/notifications" ? unreadCount : 0
             return (
               <Link
                 key={item.href}
                 href={item.href}
                 aria-current={active ? "page" : undefined}
-                aria-label={item.label}
+                aria-label={
+                  badgeCount > 0
+                    ? `${item.label} (${badgeCount} unread)`
+                    : item.label
+                }
                 className={cn(
-                  "flex flex-1 items-center justify-center rounded-full p-3 text-foreground",
+                  "relative flex flex-1 items-center justify-center rounded-full p-3 text-foreground",
                   active && "text-primary",
                 )}
               >
                 <item.icon className="size-6" aria-hidden="true" />
+                {badgeCount > 0 ? (
+                  <Badge className="absolute right-2 top-1 h-4 min-w-4 px-1 text-[10px]">
+                    {formatBadgeCount(badgeCount)}
+                  </Badge>
+                ) : null}
               </Link>
             )
           })}

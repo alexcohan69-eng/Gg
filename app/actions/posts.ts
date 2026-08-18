@@ -8,6 +8,10 @@ import { auth } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { posts } from "@/lib/db/schema"
 import {
+  createInteractionNotification,
+  deleteNotificationsForPost,
+} from "@/lib/notifications"
+import {
   MAX_MEDIA_PER_POST,
   parseMedia,
   serializeMedia,
@@ -115,9 +119,11 @@ export async function createPost(
     }
   }
 
+  let parentAuthorId: string | null = null
+
   if (replyToId) {
     const [parent] = await db
-      .select({ id: posts.id })
+      .select({ id: posts.id, userId: posts.userId })
       .from(posts)
       .where(eq(posts.id, replyToId))
       .limit(1)
@@ -125,11 +131,14 @@ export async function createPost(
     if (!parent) {
       return { success: false, error: "Original post no longer exists." }
     }
+    parentAuthorId = parent.userId
   }
+
+  const postId = crypto.randomUUID()
 
   await db.transaction(async (tx) => {
     await tx.insert(posts).values({
-      id: crypto.randomUUID(),
+      id: postId,
       userId,
       content,
       media: serializeMedia(media),
@@ -144,6 +153,17 @@ export async function createPost(
         .where(eq(posts.id, replyToId))
     }
   })
+
+  if (replyToId && parentAuthorId) {
+    // The reply itself, not the parent, is what the notification links
+    // to — the parent's content is still visible above it in the thread.
+    await createInteractionNotification({
+      recipientId: parentAuthorId,
+      actorId: userId,
+      type: "reply",
+      postId,
+    })
+  }
 
   revalidatePath("/home")
   revalidatePath("/profile")
@@ -180,6 +200,8 @@ export async function deletePost(postId: string): Promise<PostActionResult> {
   if (!deleted) {
     return { success: false, error: "Post not found." }
   }
+
+  await deleteNotificationsForPost(postId)
 
   // Best-effort cleanup of the post's uploaded media. A failure here
   // shouldn't fail the delete — the post row is already gone.
