@@ -2,10 +2,12 @@
 
 import { headers } from "next/headers"
 import { revalidatePath } from "next/cache"
+import { del } from "@vercel/blob"
 import { and, eq, sql } from "drizzle-orm"
 import { auth } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { posts } from "@/lib/db/schema"
+import { MAX_IMAGES_PER_POST } from "@/lib/media"
 
 async function getUserId() {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -14,6 +16,36 @@ async function getUserId() {
 }
 
 const MAX_POST_LENGTH = 280
+
+/**
+ * The composer uploads each image to Blob first and submits the
+ * resulting URLs as a JSON array in the "imageUrls" field. Only trust
+ * URLs that point at Vercel Blob storage, so this can't be abused to
+ * attach an arbitrary attacker-controlled URL to a post.
+ */
+function parseImageUrls(formData: FormData): string[] | null {
+  const raw = formData.get("imageUrls")
+  if (!raw) return []
+
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(String(raw))
+  } catch {
+    return null
+  }
+
+  if (!Array.isArray(parsed) || parsed.length > MAX_IMAGES_PER_POST) {
+    return null
+  }
+
+  const urls = parsed.filter(
+    (url): url is string =>
+      typeof url === "string" &&
+      /^https:\/\/[a-z0-9-]+\.public\.blob\.vercel-storage\.com\//.test(url),
+  )
+
+  return urls.length === parsed.length ? urls : null
+}
 
 export type PostActionResult = {
   success: boolean
@@ -34,8 +66,12 @@ export async function createPost(
   const content = String(formData.get("content") ?? "").trim()
   const replyToIdRaw = formData.get("replyToId")
   const replyToId = replyToIdRaw ? String(replyToIdRaw) : null
+  const imageUrls = parseImageUrls(formData)
 
-  if (!content) {
+  if (imageUrls === null) {
+    return { success: false, error: "Invalid image attachment." }
+  }
+  if (!content && imageUrls.length === 0) {
     return { success: false, error: "Post can't be empty." }
   }
   if (content.length > MAX_POST_LENGTH) {
@@ -62,6 +98,7 @@ export async function createPost(
       id: crypto.randomUUID(),
       userId,
       content,
+      imageUrls,
       replyToId,
       isReply: Boolean(replyToId),
     })
@@ -90,7 +127,11 @@ export async function deletePost(postId: string): Promise<PostActionResult> {
     const [row] = await tx
       .delete(posts)
       .where(and(eq(posts.id, postId), eq(posts.userId, userId)))
-      .returning({ id: posts.id, replyToId: posts.replyToId })
+      .returning({
+        id: posts.id,
+        replyToId: posts.replyToId,
+        imageUrls: posts.imageUrls,
+      })
 
     if (row?.replyToId) {
       await tx
@@ -104,6 +145,16 @@ export async function deletePost(postId: string): Promise<PostActionResult> {
 
   if (!deleted) {
     return { success: false, error: "Post not found." }
+  }
+
+  // Best-effort cleanup of the post's uploaded images. A failure here
+  // shouldn't fail the delete — the post row is already gone.
+  if (deleted.imageUrls?.length) {
+    try {
+      await del(deleted.imageUrls)
+    } catch (error) {
+      console.error("[v0] Failed to delete post images from blob:", error)
+    }
   }
 
   revalidatePath("/home")
