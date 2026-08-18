@@ -1,37 +1,36 @@
 import type { Metadata } from "next"
+import { headers } from "next/headers"
+import { redirect } from "next/navigation"
+import { auth } from "@/lib/auth"
+import { getFeedPosts } from "@/lib/posts"
 import { PageHeader } from "@/components/page-header"
-import {
-  Empty,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-  EmptyDescription,
-} from "@/components/ui/empty"
+import { PostComposer } from "@/components/post-composer"
+import { PostList } from "@/components/post-list"
 import { SparklesIcon } from "lucide-react"
 
 export const metadata: Metadata = {
   title: "Home",
 }
 
-export default function HomePage() {
+export default async function HomePage() {
+  const session = await auth.api.getSession({ headers: await headers() })
+  if (!session?.user) redirect("/sign-in")
+
+  const posts = await getFeedPosts()
+
   return (
     <div className="flex flex-col">
       <PageHeader title="Home" />
-      <div className="p-4">
-        <Empty>
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <SparklesIcon />
-            </EmptyMedia>
-            <EmptyTitle>Your feed is warming up</EmptyTitle>
-            <EmptyDescription>
-              Posting, replies, and the home timeline arrive in the next
-              build phase. Follow people and post your first pulse once
-              that&apos;s live.
-            </EmptyDescription>
-          </EmptyHeader>
-        </Empty>
-      </div>
+      <PostComposer
+        user={{ name: session.user.name, image: session.user.image }}
+      />
+      <PostList
+        posts={posts}
+        currentUserId={session.user.id}
+        emptyIcon={SparklesIcon}
+        emptyTitle="Your feed is quiet"
+        emptyDescription="Be the first to post — everything shared here shows up in the home timeline."
+      />
     </div>
   )
 }

@@ -44,6 +44,10 @@ export const account = pgTable("account", {
   id: text("id").primaryKey(),
   accountId: text("accountId").notNull(),
   providerId: text("providerId").notNull(),
+  // Required by Better Auth 1.7+. Forms a unique compound index with
+  // accountId (see account_issuer_accountId_uidx) that identifies a
+  // credential/provider account.
+  issuer: text("issuer").notNull(),
   userId: text("userId")
     .notNull()
     .references(() => user.id, { onDelete: "cascade" }),

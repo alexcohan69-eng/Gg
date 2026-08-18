@@ -43,7 +43,13 @@ export function ProfileSettingsForm({ profile }: { profile: Profile }) {
   }
 
   return (
-    <form action={handleSubmit} className="max-w-lg">
+    <form
+      // Remount with fresh defaultValues after a successful save + router.refresh()
+      // instead of mutating an already-mounted uncontrolled input's defaultValue.
+      key={`${profile.name}-${profile.username}-${profile.bio}-${profile.location}-${profile.website}`}
+      action={handleSubmit}
+      className="max-w-lg"
+    >
       <FieldGroup>
         <Field data-invalid={!!error}>
           <FieldLabel htmlFor="name">Name</FieldLabel>
