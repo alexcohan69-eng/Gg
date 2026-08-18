@@ -29,7 +29,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { cn, getInitials, formatRelativeTime } from "@/lib/utils"
+import { cn, getInitials, formatRelativeTime, profileHref } from "@/lib/utils"
 import type { FeedPost } from "@/lib/posts"
 
 /**
@@ -151,36 +151,45 @@ export function PostCard({
       className="flex gap-3 border-b border-border p-4 transition-colors hover:bg-muted/30"
       aria-busy={isDeleting}
     >
-      <Avatar className="size-10 shrink-0">
-        <AvatarImage src={post.authorImage ?? undefined} alt={post.authorName} />
-        <AvatarFallback>{getInitials(post.authorName)}</AvatarFallback>
-      </Avatar>
+      <Link href={profileHref({ id: post.authorId, username: post.authorUsername })} className="shrink-0">
+        <Avatar className="size-10">
+          <AvatarImage src={post.authorImage ?? undefined} alt={post.authorName} />
+          <AvatarFallback>{getInitials(post.authorName)}</AvatarFallback>
+        </Avatar>
+      </Link>
 
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <div className="flex items-start justify-between gap-2">
-          <ClickWrapper
-            href={detailHref}
-            disabled={!linkToDetail}
-            className="flex min-w-0 flex-wrap items-baseline gap-1.5 text-sm"
-          >
-            <span className="truncate font-semibold text-foreground">
-              {post.authorName}
-            </span>
-            <span className="truncate text-muted-foreground">
-              @{post.authorUsername ?? "user"}
-            </span>
-            <span className="text-muted-foreground">·</span>
-            <time
-              dateTime={new Date(post.createdAt).toISOString()}
-              className="shrink-0 text-muted-foreground hover:underline"
-              // The rendered label is a function of "now", so the server
-              // render and the client's first render can legitimately
-              // land a second apart (e.g. "10s" vs "11s").
-              suppressHydrationWarning
+          <div className="flex min-w-0 flex-wrap items-baseline gap-1.5 text-sm">
+            <Link
+              href={profileHref({ id: post.authorId, username: post.authorUsername })}
+              className="flex min-w-0 items-baseline gap-1.5 hover:underline"
             >
-              {formatRelativeTime(post.createdAt)}
-            </time>
-          </ClickWrapper>
+              <span className="truncate font-semibold text-foreground">
+                {post.authorName}
+              </span>
+              <span className="truncate text-muted-foreground">
+                @{post.authorUsername ?? "user"}
+              </span>
+            </Link>
+            <ClickWrapper
+              href={detailHref}
+              disabled={!linkToDetail}
+              className="inline-flex items-baseline gap-1.5"
+            >
+              <span className="text-muted-foreground">·</span>
+              <time
+                dateTime={new Date(post.createdAt).toISOString()}
+                className="shrink-0 text-muted-foreground hover:underline"
+                // The rendered label is a function of "now", so the server
+                // render and the client's first render can legitimately
+                // land a second apart (e.g. "10s" vs "11s").
+                suppressHydrationWarning
+              >
+                {formatRelativeTime(post.createdAt)}
+              </time>
+            </ClickWrapper>
+          </div>
 
           {isOwner ? (
             <DropdownMenu>

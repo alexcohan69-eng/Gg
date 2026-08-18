@@ -1,6 +1,6 @@
-import { and, asc, desc, eq, sql } from "drizzle-orm"
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm"
 import { db } from "@/lib/db"
-import { bookmarks, likes, posts, reposts, user } from "@/lib/db/schema"
+import { bookmarks, follows, likes, posts, reposts, user } from "@/lib/db/schema"
 
 /**
  * A post joined with its author's public profile fields plus the
@@ -63,9 +63,9 @@ function withLikeAndRepostJoins(query: any, viewerId: string) {
 }
 
 /**
- * Global chronological timeline (top-level posts only). There is no
- * follow graph wired up yet, so "home" shows every post — this is the
- * seam to add a follows-scoped query once that ships.
+ * Global chronological timeline (top-level posts only), for the "For
+ * you" home tab. See `getFollowingFeed` for the follows-scoped variant
+ * behind the "Following" tab.
  */
 export async function getFeedPosts(
   viewerId: string,
@@ -87,6 +87,44 @@ export async function getFeedPosts(
 
   return withLikeAndRepostJoins(query, viewerId)
     .where(eq(posts.isReply, false))
+    .orderBy(desc(posts.createdAt))
+    .limit(limit)
+}
+
+/**
+ * Chronological timeline scoped to accounts the viewer follows, plus
+ * the viewer's own posts (top-level posts only), for the "Following"
+ * home tab. The follow graph is small enough per-viewer to resolve the
+ * id list in one query and filter with `inArray` rather than a joined
+ * subquery — keeps this symmetric with the other feed queries above.
+ */
+export async function getFollowingFeed(
+  viewerId: string,
+  limit = FEED_PAGE_SIZE,
+): Promise<FeedPost[]> {
+  const followingRows = await db
+    .select({ followingId: follows.followingId })
+    .from(follows)
+    .where(eq(follows.followerId, viewerId))
+
+  const authorIds = [viewerId, ...followingRows.map((row) => row.followingId)]
+
+  const query = db
+    .select({
+      ...baseSelection,
+      isLiked: sql<boolean>`${likes.id} is not null`,
+      isBookmarked: sql<boolean>`${bookmarks.id} is not null`,
+      isReposted: sql<boolean>`${reposts.id} is not null`,
+    })
+    .from(posts)
+    .innerJoin(user, eq(posts.userId, user.id))
+    .leftJoin(
+      bookmarks,
+      and(eq(bookmarks.postId, posts.id), eq(bookmarks.userId, viewerId)),
+    )
+
+  return withLikeAndRepostJoins(query, viewerId)
+    .where(and(eq(posts.isReply, false), inArray(posts.userId, authorIds)))
     .orderBy(desc(posts.createdAt))
     .limit(limit)
 }
