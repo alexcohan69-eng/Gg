@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react"
 import Link from "next/link"
+import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import {
@@ -220,10 +221,47 @@ export function PostCard({
         </div>
 
         <ClickWrapper href={detailHref} disabled={!linkToDetail}>
-          <p className="whitespace-pre-wrap text-pretty break-words text-sm leading-relaxed text-foreground">
-            {post.content}
-          </p>
+          {post.content ? (
+            <p className="whitespace-pre-wrap text-pretty break-words text-sm leading-relaxed text-foreground">
+              {post.content}
+            </p>
+          ) : null}
         </ClickWrapper>
+
+        {post.imageUrls && post.imageUrls.length > 0 ? (
+          <ClickWrapper
+            href={detailHref}
+            disabled={!linkToDetail}
+            className="mt-2"
+          >
+            <div
+              className={cn(
+                "grid gap-1 overflow-hidden rounded-xl border border-border",
+                post.imageUrls.length === 1 ? "grid-cols-1" : "grid-cols-2",
+              )}
+            >
+              {post.imageUrls.map((url, index) => (
+                <div
+                  key={url}
+                  className={cn(
+                    "relative aspect-video bg-muted",
+                    post.imageUrls!.length === 3 &&
+                      index === 0 &&
+                      "col-span-2",
+                  )}
+                >
+                  <Image
+                    src={url}
+                    alt={`Image ${index + 1} attached to post by ${post.authorName}`}
+                    fill
+                    unoptimized
+                    className="object-cover"
+                  />
+                </div>
+              ))}
+            </div>
+          </ClickWrapper>
+        ) : null}
 
         <div className="-ml-2 mt-1 flex max-w-md items-center justify-between text-muted-foreground">
           <Button

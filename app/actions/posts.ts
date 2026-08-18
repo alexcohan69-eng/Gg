@@ -2,10 +2,12 @@
 
 import { headers } from "next/headers"
 import { revalidatePath } from "next/cache"
+import { del } from "@vercel/blob"
 import { and, eq, sql } from "drizzle-orm"
 import { auth } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { posts } from "@/lib/db/schema"
+import { MAX_IMAGES_PER_POST } from "@/lib/media"
 
 async function getUserId() {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -14,6 +16,51 @@ async function getUserId() {
 }
 
 const MAX_POST_LENGTH = 280
+
+// Matches the delivery URL /api/upload returns: /api/media?pathname=posts%2F<userId>%2F<file>
+const MEDIA_URL_PATTERN = /^\/api\/media\?pathname=posts%2F[^&]+$/
+
+/**
+ * The composer uploads each image to Blob first (through /api/upload,
+ * which returns our own /api/media delivery URL — the store is
+ * private, so the raw blob.url isn't fetchable by the browser) and
+ * submits the resulting URLs as a JSON array in the "imageUrls"
+ * field. Only trust our own delivery-route shape, so this can't be
+ * abused to attach an arbitrary attacker-controlled URL to a post.
+ */
+function parseImageUrls(formData: FormData): string[] | null {
+  const raw = formData.get("imageUrls")
+  if (!raw) return []
+
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(String(raw))
+  } catch {
+    return null
+  }
+
+  if (!Array.isArray(parsed) || parsed.length > MAX_IMAGES_PER_POST) {
+    return null
+  }
+
+  const urls = parsed.filter(
+    (url): url is string =>
+      typeof url === "string" && MEDIA_URL_PATTERN.test(url),
+  )
+
+  return urls.length === parsed.length ? urls : null
+}
+
+function mediaUrlToPathname(url: string): string | null {
+  try {
+    const pathname = new URL(url, "http://localhost").searchParams.get(
+      "pathname",
+    )
+    return pathname && pathname.startsWith("posts/") ? pathname : null
+  } catch {
+    return null
+  }
+}
 
 export type PostActionResult = {
   success: boolean
@@ -34,8 +81,12 @@ export async function createPost(
   const content = String(formData.get("content") ?? "").trim()
   const replyToIdRaw = formData.get("replyToId")
   const replyToId = replyToIdRaw ? String(replyToIdRaw) : null
+  const imageUrls = parseImageUrls(formData)
 
-  if (!content) {
+  if (imageUrls === null) {
+    return { success: false, error: "Invalid image attachment." }
+  }
+  if (!content && imageUrls.length === 0) {
     return { success: false, error: "Post can't be empty." }
   }
   if (content.length > MAX_POST_LENGTH) {
@@ -62,6 +113,7 @@ export async function createPost(
       id: crypto.randomUUID(),
       userId,
       content,
+      imageUrls,
       replyToId,
       isReply: Boolean(replyToId),
     })
@@ -90,7 +142,11 @@ export async function deletePost(postId: string): Promise<PostActionResult> {
     const [row] = await tx
       .delete(posts)
       .where(and(eq(posts.id, postId), eq(posts.userId, userId)))
-      .returning({ id: posts.id, replyToId: posts.replyToId })
+      .returning({
+        id: posts.id,
+        replyToId: posts.replyToId,
+        imageUrls: posts.imageUrls,
+      })
 
     if (row?.replyToId) {
       await tx
@@ -104,6 +160,20 @@ export async function deletePost(postId: string): Promise<PostActionResult> {
 
   if (!deleted) {
     return { success: false, error: "Post not found." }
+  }
+
+  // Best-effort cleanup of the post's uploaded images. A failure here
+  // shouldn't fail the delete — the post row is already gone.
+  const pathnames = (deleted.imageUrls ?? [])
+    .map(mediaUrlToPathname)
+    .filter((p): p is string => p !== null)
+
+  if (pathnames.length) {
+    try {
+      await del(pathnames)
+    } catch (error) {
+      console.error("[v0] Failed to delete post images from blob:", error)
+    }
   }
 
   revalidatePath("/home")
