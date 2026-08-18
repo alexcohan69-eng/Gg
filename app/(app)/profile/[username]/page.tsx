@@ -3,12 +3,8 @@ import { headers } from "next/headers"
 import { notFound, redirect } from "next/navigation"
 import { auth } from "@/lib/auth"
 import { getUserPosts } from "@/lib/posts"
-import {
-  getFollowCounts,
-  getProfileByIdentifier,
-  isFollowing,
-  profileHref,
-} from "@/lib/follows"
+import { getFollowCounts, getProfileByIdentifier, isFollowing } from "@/lib/follows"
+import { profileHref } from "@/lib/utils"
 import { PageHeader } from "@/components/page-header"
 import { BackButton } from "@/components/back-button"
 import { ProfileHeader } from "@/components/profile-header"
