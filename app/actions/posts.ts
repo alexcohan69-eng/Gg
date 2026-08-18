@@ -7,7 +7,12 @@ import { and, eq, sql } from "drizzle-orm"
 import { auth } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { posts } from "@/lib/db/schema"
-import { MAX_IMAGES_PER_POST } from "@/lib/media"
+import {
+  MAX_MEDIA_PER_POST,
+  validateMediaAttachments,
+  type MediaAttachment,
+  type MediaType,
+} from "@/lib/media"
 
 async function getUserId() {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -19,17 +24,22 @@ const MAX_POST_LENGTH = 280
 
 // Matches the delivery URL /api/upload returns: /api/media?pathname=posts%2F<userId>%2F<file>
 const MEDIA_URL_PATTERN = /^\/api\/media\?pathname=posts%2F[^&]+$/
+const MEDIA_TYPES: readonly MediaType[] = ["image", "gif", "video"]
 
 /**
- * The composer uploads each image to Blob first (through /api/upload,
- * which returns our own /api/media delivery URL — the store is
- * private, so the raw blob.url isn't fetchable by the browser) and
- * submits the resulting URLs as a JSON array in the "imageUrls"
- * field. Only trust our own delivery-route shape, so this can't be
- * abused to attach an arbitrary attacker-controlled URL to a post.
+ * The composer uploads each file to Blob first (through /api/upload,
+ * which returns our own /api/media delivery URL plus its detected
+ * type — the store is private, so the raw blob.url isn't fetchable by
+ * the browser) and submits the resulting {url, type} pairs as a JSON
+ * array in the "media" field. Only trust our own delivery-route shape
+ * and a known type, so this can't be abused to attach an
+ * arbitrary attacker-controlled URL or type to a post. The full set is
+ * also re-checked against the attach rules (max count, no mixing
+ * video with images/gifs) since the client-side composer's own
+ * enforcement is only a UX shortcut.
  */
-function parseImageUrls(formData: FormData): string[] | null {
-  const raw = formData.get("imageUrls")
+function parseMediaAttachments(formData: FormData): MediaAttachment[] | null {
+  const raw = formData.get("media")
   if (!raw) return []
 
   let parsed: unknown
@@ -39,16 +49,23 @@ function parseImageUrls(formData: FormData): string[] | null {
     return null
   }
 
-  if (!Array.isArray(parsed) || parsed.length > MAX_IMAGES_PER_POST) {
+  if (!Array.isArray(parsed) || parsed.length > MAX_MEDIA_PER_POST) {
     return null
   }
 
-  const urls = parsed.filter(
-    (url): url is string =>
-      typeof url === "string" && MEDIA_URL_PATTERN.test(url),
+  const media = parsed.filter(
+    (item): item is MediaAttachment =>
+      typeof item === "object" &&
+      item !== null &&
+      typeof (item as MediaAttachment).url === "string" &&
+      MEDIA_URL_PATTERN.test((item as MediaAttachment).url) &&
+      MEDIA_TYPES.includes((item as MediaAttachment).type),
   )
 
-  return urls.length === parsed.length ? urls : null
+  if (media.length !== parsed.length) return null
+  if (validateMediaAttachments(media)) return null
+
+  return media
 }
 
 function mediaUrlToPathname(url: string): string | null {
@@ -81,12 +98,12 @@ export async function createPost(
   const content = String(formData.get("content") ?? "").trim()
   const replyToIdRaw = formData.get("replyToId")
   const replyToId = replyToIdRaw ? String(replyToIdRaw) : null
-  const imageUrls = parseImageUrls(formData)
+  const media = parseMediaAttachments(formData)
 
-  if (imageUrls === null) {
-    return { success: false, error: "Invalid image attachment." }
+  if (media === null) {
+    return { success: false, error: "Invalid media attachment." }
   }
-  if (!content && imageUrls.length === 0) {
+  if (!content && media.length === 0) {
     return { success: false, error: "Post can't be empty." }
   }
   if (content.length > MAX_POST_LENGTH) {
@@ -113,7 +130,7 @@ export async function createPost(
       id: crypto.randomUUID(),
       userId,
       content,
-      imageUrls,
+      media,
       replyToId,
       isReply: Boolean(replyToId),
     })
@@ -137,7 +154,7 @@ export async function deletePost(postId: string): Promise<PostActionResult> {
   const userId = await getUserId()
 
   // Scope the delete by userId so a user can only ever delete their own
-  // posts — there is no RLS on Neon, so this check is what protects rows.
+  // posts — there is no RLS on Aurora, so this check is what protects rows.
   const deleted = await db.transaction(async (tx) => {
     const [row] = await tx
       .delete(posts)
@@ -145,7 +162,7 @@ export async function deletePost(postId: string): Promise<PostActionResult> {
       .returning({
         id: posts.id,
         replyToId: posts.replyToId,
-        imageUrls: posts.imageUrls,
+        media: posts.media,
       })
 
     if (row?.replyToId) {
@@ -162,17 +179,17 @@ export async function deletePost(postId: string): Promise<PostActionResult> {
     return { success: false, error: "Post not found." }
   }
 
-  // Best-effort cleanup of the post's uploaded images. A failure here
+  // Best-effort cleanup of the post's uploaded media. A failure here
   // shouldn't fail the delete — the post row is already gone.
-  const pathnames = (deleted.imageUrls ?? [])
-    .map(mediaUrlToPathname)
+  const pathnames = (deleted.media ?? [])
+    .map((item) => mediaUrlToPathname(item.url))
     .filter((p): p is string => p !== null)
 
   if (pathnames.length) {
     try {
       await del(pathnames)
     } catch (error) {
-      console.error("[v0] Failed to delete post images from blob:", error)
+      console.error("[v0] Failed to delete post media from blob:", error)
     }
   }
 

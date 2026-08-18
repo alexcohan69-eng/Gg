@@ -4,12 +4,20 @@ import { get } from "@vercel/blob"
 import { auth } from "@/lib/auth"
 
 /**
- * Streams a privately-stored post image to any authenticated user.
- * Post images are viewable by anyone who can see the post (this is a
- * public feed), so the only check here is "is there a session at
- * all" — not ownership. Mutating actions (uploading, deleting) are
- * the ones scoped to the owning user, in /api/upload and the post
- * delete action.
+ * Streams a privately-stored post attachment (image, GIF, or video) to
+ * any authenticated user. Attachments are viewable by anyone who can
+ * see the post (this is a public feed), so the only check here is "is
+ * there a session at all" — not ownership. Mutating actions
+ * (uploading, deleting) are the ones scoped to the owning user, in
+ * /api/upload and the post delete action.
+ *
+ * The incoming `Range` header (used by `<video>` for seeking) is
+ * forwarded to the underlying blob fetch, and the response is relayed
+ * as a real 206 Partial Content when the origin honors it. This is a
+ * best-effort passthrough — @vercel/blob's `get()` doesn't formally
+ * type a 206 result, so we detect it from the raw response headers
+ * rather than relying on `statusCode`. If the origin doesn't honor the
+ * range, we fall back to serving the full file.
  */
 export async function GET(request: NextRequest) {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -22,10 +30,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Invalid pathname" }, { status: 400 })
   }
 
+  const range = request.headers.get("range") ?? undefined
+
   try {
     const result = await get(pathname, {
       access: "private",
       ifNoneMatch: request.headers.get("if-none-match") ?? undefined,
+      headers: range ? { Range: range } : undefined,
     })
 
     if (!result) {
@@ -42,15 +53,22 @@ export async function GET(request: NextRequest) {
       })
     }
 
+    const contentRange = result.headers.get("content-range")
+    const contentLength = result.headers.get("content-length")
+
     return new NextResponse(result.stream, {
+      status: contentRange ? 206 : 200,
       headers: {
         "Content-Type": result.blob.contentType,
+        "Accept-Ranges": "bytes",
         ETag: result.blob.etag,
         "Cache-Control": "private, no-cache",
+        ...(contentRange ? { "Content-Range": contentRange } : {}),
+        ...(contentLength ? { "Content-Length": contentLength } : {}),
       },
     })
   } catch (error) {
     console.error("[v0] Failed to serve media:", error)
-    return NextResponse.json({ error: "Failed to load image" }, { status: 500 })
+    return NextResponse.json({ error: "Failed to load media" }, { status: 500 })
   }
 }

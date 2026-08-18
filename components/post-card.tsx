@@ -228,39 +228,66 @@ export function PostCard({
           ) : null}
         </ClickWrapper>
 
-        {post.imageUrls && post.imageUrls.length > 0 ? (
-          <ClickWrapper
-            href={detailHref}
-            disabled={!linkToDetail}
-            className="mt-2"
-          >
-            <div
-              className={cn(
-                "grid gap-1 overflow-hidden rounded-xl border border-border",
-                post.imageUrls.length === 1 ? "grid-cols-1" : "grid-cols-2",
-              )}
-            >
-              {post.imageUrls.map((url, index) => (
-                <div
-                  key={url}
-                  className={cn(
-                    "relative aspect-video bg-muted",
-                    post.imageUrls!.length === 3 &&
-                      index === 0 &&
-                      "col-span-2",
-                  )}
-                >
-                  <Image
-                    src={url}
-                    alt={`Image ${index + 1} attached to post by ${post.authorName}`}
-                    fill
-                    unoptimized
-                    className="object-cover"
-                  />
-                </div>
-              ))}
+        {post.media && post.media.length > 0 ? (
+          post.media[0].type === "video" ? (
+            // Videos are never mixed with other attachments (enforced at
+            // post-creation time), so a post either has one video or a
+            // grid of images/GIFs — never both.
+            <div className="mt-2 overflow-hidden rounded-xl border border-border">
+              <video
+                src={post.media[0].url}
+                controls
+                playsInline
+                preload="metadata"
+                className="max-h-[32rem] w-full bg-black"
+                aria-label={`Video attached to post by ${post.authorName}`}
+              >
+                Your browser doesn&apos;t support embedded video playback.
+              </video>
             </div>
-          </ClickWrapper>
+          ) : (
+            <ClickWrapper
+              href={detailHref}
+              disabled={!linkToDetail}
+              className="mt-2"
+            >
+              <div
+                className={cn(
+                  "grid gap-1 overflow-hidden rounded-xl border border-border",
+                  post.media.length === 1 ? "grid-cols-1" : "grid-cols-2",
+                )}
+              >
+                {post.media.map((item, index) => (
+                  <div
+                    key={item.url}
+                    className={cn(
+                      "relative aspect-video bg-muted",
+                      post.media!.length === 3 &&
+                        index === 0 &&
+                        "col-span-2",
+                    )}
+                  >
+                    <Image
+                      src={item.url}
+                      alt={
+                        item.type === "gif"
+                          ? `GIF ${index + 1} attached to post by ${post.authorName}`
+                          : `Image ${index + 1} attached to post by ${post.authorName}`
+                      }
+                      fill
+                      unoptimized
+                      className="object-cover"
+                    />
+                    {item.type === "gif" ? (
+                      <span className="absolute bottom-1.5 left-1.5 rounded bg-background/80 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-foreground backdrop-blur-sm">
+                        GIF
+                      </span>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            </ClickWrapper>
+          )
         ) : null}
 
         <div className="-ml-2 mt-1 flex max-w-md items-center justify-between text-muted-foreground">
