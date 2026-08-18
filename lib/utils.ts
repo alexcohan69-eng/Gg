@@ -14,6 +14,16 @@ export function getInitials(name: string) {
     .join('')
 }
 
+/**
+ * The public identifier to use when linking to a user's profile. Lives
+ * here (not `lib/follows.ts`) because it's a pure string helper used
+ * from client components like `PostCard` — `lib/follows.ts` imports
+ * the server-only `db` client, which must never end up in a client bundle.
+ */
+export function profileHref(u: { username: string | null; id: string }) {
+  return `/profile/${u.username ?? u.id}`
+}
+
 /** Twitter-style relative timestamp: 5s, 12m, 3h, 4d, then a short date. */
 export function formatRelativeTime(date: Date | string) {
   const value = typeof date === 'string' ? new Date(date) : date
