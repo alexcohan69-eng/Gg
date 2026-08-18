@@ -4,9 +4,7 @@ import {
   boolean,
   timestamp,
   integer,
-  jsonb,
 } from "drizzle-orm/pg-core"
-import type { MediaAttachment } from "@/lib/media"
 
 /**
  * Better Auth core tables. Column names are camelCase to match Better
@@ -82,7 +80,10 @@ export const posts = pgTable("posts", {
   id: text("id").primaryKey(),
   userId: text("userId").notNull(),
   content: text("content").notNull(),
-  media: jsonb("media").$type<MediaAttachment[]>().default([]),
+  // Stored as a JSON string, not a native jsonb column — Aurora DSQL
+  // doesn't support JSON/JSONB columns. Serialize/parse in application
+  // code (see lib/media.ts's serializeMedia/parseMedia helpers).
+  media: text("media").notNull().default("[]"),
   replyToId: text("replyToId"),
   repostOfId: text("repostOfId"),
   quoteOfId: text("quoteOfId"),

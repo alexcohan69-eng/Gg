@@ -125,3 +125,22 @@ export function validateImageFile(file: {
 }): string | null {
   return validateMediaFile(file)
 }
+
+/**
+ * `posts.media` is stored as a JSON-encoded TEXT column (Aurora DSQL
+ * doesn't support jsonb), so every read/write goes through these two
+ * helpers instead of relying on Drizzle to serialize the column.
+ */
+export function serializeMedia(media: MediaAttachment[]): string {
+  return JSON.stringify(media)
+}
+
+export function parseMedia(raw: string | null): MediaAttachment[] {
+  if (!raw) return []
+  try {
+    const parsed = JSON.parse(raw)
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}

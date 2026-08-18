@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { bookmarks, follows, likes, posts, reposts, user } from "@/lib/db/schema"
-import type { MediaAttachment } from "@/lib/media"
+import { parseMedia, type MediaAttachment } from "@/lib/media"
 
 /**
  * A post joined with its author's public profile fields plus the
@@ -13,7 +13,7 @@ import type { MediaAttachment } from "@/lib/media"
 export type FeedPost = {
   id: string
   content: string
-  media: MediaAttachment[] | null
+  media: MediaAttachment[]
   createdAt: Date
   likeCount: number
   replyCount: number
@@ -51,6 +51,15 @@ const baseSelection = {
  * (userId, postId) index on each table guarantees at most one matching
  * row, so this never fans out the result set.
  */
+/**
+ * `posts.media` comes back from the database as a JSON-encoded
+ * string (see lib/media.ts) — every query result row is passed
+ * through this before it's returned as a `FeedPost`.
+ */
+function toFeedPost(row: Omit<FeedPost, "media"> & { media: string }): FeedPost {
+  return { ...row, media: parseMedia(row.media) }
+}
+
 function withLikeAndRepostJoins(query: any, viewerId: string) {
   return query
     .leftJoin(
@@ -86,10 +95,12 @@ export async function getFeedPosts(
       and(eq(bookmarks.postId, posts.id), eq(bookmarks.userId, viewerId)),
     )
 
-  return withLikeAndRepostJoins(query, viewerId)
+  const rows = await withLikeAndRepostJoins(query, viewerId)
     .where(eq(posts.isReply, false))
     .orderBy(desc(posts.createdAt))
     .limit(limit)
+
+  return rows.map(toFeedPost)
 }
 
 /**
@@ -124,10 +135,12 @@ export async function getFollowingFeed(
       and(eq(bookmarks.postId, posts.id), eq(bookmarks.userId, viewerId)),
     )
 
-  return withLikeAndRepostJoins(query, viewerId)
+  const rows = await withLikeAndRepostJoins(query, viewerId)
     .where(and(eq(posts.isReply, false), inArray(posts.userId, authorIds)))
     .orderBy(desc(posts.createdAt))
     .limit(limit)
+
+  return rows.map(toFeedPost)
 }
 
 /** Top-level posts authored by a single user, newest first. */
@@ -150,10 +163,12 @@ export async function getUserPosts(
       and(eq(bookmarks.postId, posts.id), eq(bookmarks.userId, viewerId)),
     )
 
-  return withLikeAndRepostJoins(query, viewerId)
+  const rows = await withLikeAndRepostJoins(query, viewerId)
     .where(and(eq(posts.userId, userId), eq(posts.isReply, false)))
     .orderBy(desc(posts.createdAt))
     .limit(limit)
+
+  return rows.map(toFeedPost)
 }
 
 /**
@@ -177,10 +192,12 @@ export async function getBookmarkedPosts(
     .innerJoin(posts, eq(bookmarks.postId, posts.id))
     .innerJoin(user, eq(posts.userId, user.id))
 
-  return withLikeAndRepostJoins(query, viewerId)
+  const rows = await withLikeAndRepostJoins(query, viewerId)
     .where(eq(bookmarks.userId, viewerId))
     .orderBy(desc(bookmarks.createdAt))
     .limit(limit)
+
+  return rows.map(toFeedPost)
 }
 
 /**
@@ -211,7 +228,7 @@ export async function getPostById(
     .where(eq(posts.id, postId))
     .limit(1)
 
-  return rows[0] ?? null
+  return rows[0] ? toFeedPost(rows[0]) : null
 }
 
 /**
@@ -239,8 +256,10 @@ export async function getPostReplies(
       and(eq(bookmarks.postId, posts.id), eq(bookmarks.userId, viewerId)),
     )
 
-  return withLikeAndRepostJoins(query, viewerId)
+  const rows = await withLikeAndRepostJoins(query, viewerId)
     .where(eq(posts.replyToId, postId))
     .orderBy(asc(posts.createdAt))
     .limit(limit)
+
+  return rows.map(toFeedPost)
 }

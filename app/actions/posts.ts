@@ -9,6 +9,8 @@ import { db } from "@/lib/db"
 import { posts } from "@/lib/db/schema"
 import {
   MAX_MEDIA_PER_POST,
+  parseMedia,
+  serializeMedia,
   validateMediaAttachments,
   type MediaAttachment,
   type MediaType,
@@ -130,7 +132,7 @@ export async function createPost(
       id: crypto.randomUUID(),
       userId,
       content,
-      media,
+      media: serializeMedia(media),
       replyToId,
       isReply: Boolean(replyToId),
     })
@@ -181,7 +183,7 @@ export async function deletePost(postId: string): Promise<PostActionResult> {
 
   // Best-effort cleanup of the post's uploaded media. A failure here
   // shouldn't fail the delete — the post row is already gone.
-  const pathnames = (deleted.media ?? [])
+  const pathnames = parseMedia(deleted.media)
     .map((item) => mediaUrlToPathname(item.url))
     .filter((p): p is string => p !== null)
 
