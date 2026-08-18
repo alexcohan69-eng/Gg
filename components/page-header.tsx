@@ -4,11 +4,14 @@ export function PageHeader({
   title,
   description,
   className,
+  leading,
   children,
 }: {
   title: string
   description?: string
   className?: string
+  /** Optional element rendered before the title, e.g. a back button. */
+  leading?: React.ReactNode
   children?: React.ReactNode
 }) {
   return (
@@ -18,15 +21,18 @@ export function PageHeader({
         className,
       )}
     >
-      <div>
-        <h1 className="font-heading text-xl font-semibold tracking-tight text-foreground">
-          {title}
-        </h1>
-        {description ? (
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            {description}
-          </p>
-        ) : null}
+      <div className="flex items-center gap-3">
+        {leading}
+        <div>
+          <h1 className="font-heading text-xl font-semibold tracking-tight text-foreground">
+            {title}
+          </h1>
+          {description ? (
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              {description}
+            </p>
+          ) : null}
+        </div>
       </div>
       {children}
     </header>

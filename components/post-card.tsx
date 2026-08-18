@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useTransition } from "react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import {
@@ -31,21 +32,47 @@ import {
 import { cn, getInitials, formatRelativeTime } from "@/lib/utils"
 import type { FeedPost } from "@/lib/posts"
 
-/** Action-bar buttons that don't have a live feature behind them yet. */
-function comingSoon(label: string) {
-  toast.info(`${label} are coming soon`)
+/**
+ * Renders `children` as a link to the post's detail page, or as a
+ * plain `div` when navigation is disabled (e.g. the root post already
+ * being viewed on its own detail page). Keeping this as one wrapper
+ * avoids duplicating the header/content markup for both cases.
+ */
+function ClickWrapper({
+  href,
+  disabled,
+  className,
+  children,
+}: {
+  href: string
+  disabled?: boolean
+  className?: string
+  children: React.ReactNode
+}) {
+  if (disabled) {
+    return <div className={className}>{children}</div>
+  }
+  return (
+    <Link href={href} className={className}>
+      {children}
+    </Link>
+  )
 }
 
 export function PostCard({
   post,
   currentUserId,
+  linkToDetail = true,
 }: {
   post: FeedPost
   currentUserId: string
+  /** Set to false when rendering the post being actively viewed on its own detail page. */
+  linkToDetail?: boolean
 }) {
   const router = useRouter()
   const [isDeleting, startDeleting] = useTransition()
   const isOwner = post.authorId === currentUserId
+  const detailHref = `/post/${post.id}`
 
   const [liked, setLiked] = useState(post.isLiked)
   const [likeCount, setLikeCount] = useState(post.likeCount)
@@ -131,7 +158,11 @@ export function PostCard({
 
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <div className="flex items-start justify-between gap-2">
-          <div className="flex min-w-0 flex-wrap items-baseline gap-1.5 text-sm">
+          <ClickWrapper
+            href={detailHref}
+            disabled={!linkToDetail}
+            className="flex min-w-0 flex-wrap items-baseline gap-1.5 text-sm"
+          >
             <span className="truncate font-semibold text-foreground">
               {post.authorName}
             </span>
@@ -141,7 +172,7 @@ export function PostCard({
             <span className="text-muted-foreground">·</span>
             <time
               dateTime={new Date(post.createdAt).toISOString()}
-              className="shrink-0 text-muted-foreground"
+              className="shrink-0 text-muted-foreground hover:underline"
               // The rendered label is a function of "now", so the server
               // render and the client's first render can legitimately
               // land a second apart (e.g. "10s" vs "11s").
@@ -149,7 +180,7 @@ export function PostCard({
             >
               {formatRelativeTime(post.createdAt)}
             </time>
-          </div>
+          </ClickWrapper>
 
           {isOwner ? (
             <DropdownMenu>
@@ -179,16 +210,19 @@ export function PostCard({
           ) : null}
         </div>
 
-        <p className="whitespace-pre-wrap text-pretty break-words text-sm leading-relaxed text-foreground">
-          {post.content}
-        </p>
+        <ClickWrapper href={detailHref} disabled={!linkToDetail}>
+          <p className="whitespace-pre-wrap text-pretty break-words text-sm leading-relaxed text-foreground">
+            {post.content}
+          </p>
+        </ClickWrapper>
 
         <div className="-ml-2 mt-1 flex max-w-md items-center justify-between text-muted-foreground">
           <Button
             variant="ghost"
             size="sm"
             className="gap-1.5 rounded-full hover:text-primary"
-            onClick={() => comingSoon("Replies")}
+            aria-label="Reply"
+            onClick={() => router.push(detailHref)}
           >
             <MessageCircleIcon />
             {post.replyCount > 0 ? post.replyCount : null}

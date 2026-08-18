@@ -14,8 +14,20 @@ const MAX_POST_LENGTH = 280
 
 export function PostComposer({
   user,
+  replyToId,
+  placeholder = "What's happening?",
+  submitLabel = "Post",
+  autoFocus = false,
+  onPosted,
 }: {
   user: { name: string; image?: string | null }
+  /** When set, the created post is a reply to this post id. */
+  replyToId?: string
+  placeholder?: string
+  submitLabel?: string
+  autoFocus?: boolean
+  /** Called after a successful post, e.g. to refocus or scroll a list. */
+  onPosted?: () => void
 }) {
   const router = useRouter()
   const formRef = useRef<HTMLFormElement>(null)
@@ -27,6 +39,10 @@ export function PostComposer({
   const isOverLimit = remaining < 0
 
   function handleSubmit(formData: FormData) {
+    if (replyToId) {
+      formData.set("replyToId", replyToId)
+    }
+
     startTransition(async () => {
       const result = await createPost(formData)
       if (!result.success) {
@@ -35,6 +51,7 @@ export function PostComposer({
       }
       setContent("")
       formRef.current?.reset()
+      onPosted?.()
       router.refresh()
     })
   }
@@ -55,9 +72,10 @@ export function PostComposer({
           name="content"
           value={content}
           onChange={(e) => setContent(e.target.value)}
-          placeholder="What's happening?"
-          aria-label="Post content"
-          rows={2}
+          placeholder={placeholder}
+          aria-label={replyToId ? "Reply content" : "Post content"}
+          rows={replyToId ? 3 : 2}
+          autoFocus={autoFocus}
           className="border-none px-0 py-1 text-lg focus-visible:ring-0"
           disabled={isPending}
         />
@@ -77,7 +95,7 @@ export function PostComposer({
             disabled={isEmpty || isOverLimit || isPending}
           >
             {isPending ? <Spinner data-icon="inline-start" /> : null}
-            Post
+            {submitLabel}
           </Button>
         </div>
       </div>
