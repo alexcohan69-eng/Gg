@@ -44,7 +44,7 @@ export default async function ProfilePage() {
     year: "numeric",
   })
 
-  const posts = await getUserPosts(user.id)
+  const posts = await getUserPosts(user.id, user.id)
 
   return (
     <div className="flex flex-col">

@@ -114,6 +114,13 @@ export const bookmarks = pgTable("bookmarks", {
   createdAt: timestamp("createdAt").notNull().defaultNow(),
 })
 
+export const reposts = pgTable("reposts", {
+  id: text("id").primaryKey(),
+  userId: text("userId").notNull(),
+  postId: text("postId").notNull(),
+  createdAt: timestamp("createdAt").notNull().defaultNow(),
+})
+
 export const notifications = pgTable("notifications", {
   id: text("id").primaryKey(),
   userId: text("userId").notNull(),
