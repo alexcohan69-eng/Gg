@@ -39,7 +39,6 @@ function useImageAttachments() {
     }
 
     for (const file of files.slice(0, room)) {
-      console.log("[v0] selected file", file.name, file.size, file.type)
       const validationError = validateImageFile(file)
       if (validationError) {
         toast.error(validationError)

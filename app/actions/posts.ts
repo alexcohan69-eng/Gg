@@ -17,11 +17,16 @@ async function getUserId() {
 
 const MAX_POST_LENGTH = 280
 
+// Matches the delivery URL /api/upload returns: /api/media?pathname=posts%2F<userId>%2F<file>
+const MEDIA_URL_PATTERN = /^\/api\/media\?pathname=posts%2F[^&]+$/
+
 /**
- * The composer uploads each image to Blob first and submits the
- * resulting URLs as a JSON array in the "imageUrls" field. Only trust
- * URLs that point at Vercel Blob storage, so this can't be abused to
- * attach an arbitrary attacker-controlled URL to a post.
+ * The composer uploads each image to Blob first (through /api/upload,
+ * which returns our own /api/media delivery URL — the store is
+ * private, so the raw blob.url isn't fetchable by the browser) and
+ * submits the resulting URLs as a JSON array in the "imageUrls"
+ * field. Only trust our own delivery-route shape, so this can't be
+ * abused to attach an arbitrary attacker-controlled URL to a post.
  */
 function parseImageUrls(formData: FormData): string[] | null {
   const raw = formData.get("imageUrls")
@@ -40,11 +45,21 @@ function parseImageUrls(formData: FormData): string[] | null {
 
   const urls = parsed.filter(
     (url): url is string =>
-      typeof url === "string" &&
-      /^https:\/\/[a-z0-9-]+\.public\.blob\.vercel-storage\.com\//.test(url),
+      typeof url === "string" && MEDIA_URL_PATTERN.test(url),
   )
 
   return urls.length === parsed.length ? urls : null
+}
+
+function mediaUrlToPathname(url: string): string | null {
+  try {
+    const pathname = new URL(url, "http://localhost").searchParams.get(
+      "pathname",
+    )
+    return pathname && pathname.startsWith("posts/") ? pathname : null
+  } catch {
+    return null
+  }
 }
 
 export type PostActionResult = {
@@ -149,9 +164,13 @@ export async function deletePost(postId: string): Promise<PostActionResult> {
 
   // Best-effort cleanup of the post's uploaded images. A failure here
   // shouldn't fail the delete — the post row is already gone.
-  if (deleted.imageUrls?.length) {
+  const pathnames = (deleted.imageUrls ?? [])
+    .map(mediaUrlToPathname)
+    .filter((p): p is string => p !== null)
+
+  if (pathnames.length) {
     try {
-      await del(deleted.imageUrls)
+      await del(pathnames)
     } catch (error) {
       console.error("[v0] Failed to delete post images from blob:", error)
     }
