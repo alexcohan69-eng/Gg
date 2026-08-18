@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { bookmarks, follows, likes, posts, reposts, user } from "@/lib/db/schema"
+import type { MediaAttachment } from "@/lib/media"
 
 /**
  * A post joined with its author's public profile fields plus the
@@ -12,7 +13,7 @@ import { bookmarks, follows, likes, posts, reposts, user } from "@/lib/db/schema
 export type FeedPost = {
   id: string
   content: string
-  imageUrls: string[] | null
+  media: MediaAttachment[] | null
   createdAt: Date
   likeCount: number
   replyCount: number
@@ -32,7 +33,7 @@ const FEED_PAGE_SIZE = 30
 const baseSelection = {
   id: posts.id,
   content: posts.content,
-  imageUrls: posts.imageUrls,
+  media: posts.media,
   createdAt: posts.createdAt,
   likeCount: posts.likeCount,
   replyCount: posts.replyCount,

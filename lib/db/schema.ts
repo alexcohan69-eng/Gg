@@ -6,6 +6,7 @@ import {
   integer,
   jsonb,
 } from "drizzle-orm/pg-core"
+import type { MediaAttachment } from "@/lib/media"
 
 /**
  * Better Auth core tables. Column names are camelCase to match Better
@@ -81,7 +82,7 @@ export const posts = pgTable("posts", {
   id: text("id").primaryKey(),
   userId: text("userId").notNull(),
   content: text("content").notNull(),
-  imageUrls: jsonb("imageUrls").$type<string[]>().default([]),
+  media: jsonb("media").$type<MediaAttachment[]>().default([]),
   replyToId: text("replyToId"),
   repostOfId: text("repostOfId"),
   quoteOfId: text("quoteOfId"),

@@ -2,13 +2,15 @@ import { put } from "@vercel/blob"
 import { headers } from "next/headers"
 import { NextResponse, type NextRequest } from "next/server"
 import { auth } from "@/lib/auth"
-import { validateImageFile } from "@/lib/media"
+import { getMediaTypeForMime, validateMediaFile } from "@/lib/media"
 
 /**
- * Uploads a single image to Vercel Blob for use as a post attachment.
- * Requires an authenticated session — this is the server-side gate
- * that stops unauthenticated or unauthorized callers from writing to
- * blob storage, since anyone can hit this route's URL directly.
+ * Uploads a single image, GIF, or video to Vercel Blob for use as a
+ * post attachment. Requires an authenticated session — this is the
+ * server-side gate that stops unauthenticated or unauthorized callers
+ * from writing to blob storage, since anyone can hit this route's URL
+ * directly. This re-validates type and size independently of the
+ * composer's own check, which is only a UX shortcut.
  */
 export async function POST(request: NextRequest) {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -28,9 +30,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "No file provided." }, { status: 400 })
   }
 
-  const validationError = validateImageFile(file)
+  const validationError = validateMediaFile(file)
   if (validationError) {
     return NextResponse.json({ error: validationError }, { status: 400 })
+  }
+
+  const mediaType = getMediaTypeForMime(file.type)
+  if (!mediaType) {
+    return NextResponse.json({ error: "Unsupported file type." }, { status: 400 })
   }
 
   try {
@@ -40,10 +47,11 @@ export async function POST(request: NextRequest) {
     })
 
     // The store is private, so `blob.url` isn't publicly fetchable. We
-    // persist and render images through `/api/media`, which streams the
+    // persist and render media through `/api/media`, which streams the
     // file after checking for an authenticated session.
     return NextResponse.json({
       url: `/api/media?pathname=${encodeURIComponent(blob.pathname)}`,
+      type: mediaType,
     })
   } catch (error) {
     console.error("[v0] Blob upload failed:", error)

@@ -1,36 +1,127 @@
 /**
- * Shared image-attachment constants and validation, used by both the
- * client (post composer) and the server (upload route) so the two
- * never drift out of sync.
+ * Shared media-attachment constants and validation, used by both the
+ * client (post composer) and the server (upload route + createPost
+ * action) so none of the three ever drift out of sync.
+ *
+ * Three attachment kinds are supported:
+ * - "image": static JPEG/PNG/WebP
+ * - "gif": image/gif — kept as its own type (not lumped into "image")
+ *   so the UI can badge it and so future rendering rules can diverge,
+ *   even though it's delivered the same way an image is.
+ * - "video": MP4/WebM/MOV, rendered with a native <video> player.
  */
+
+export type MediaType = "image" | "gif" | "video"
+
+export type MediaAttachment = {
+  url: string
+  type: MediaType
+}
 
 export const ALLOWED_IMAGE_TYPES = [
   "image/jpeg",
   "image/png",
   "image/webp",
-  "image/gif",
+] as const
+
+export const ALLOWED_GIF_TYPES = ["image/gif"] as const
+
+export const ALLOWED_VIDEO_TYPES = [
+  "video/mp4",
+  "video/webm",
+  "video/quicktime",
+] as const
+
+export const ALLOWED_MEDIA_TYPES = [
+  ...ALLOWED_IMAGE_TYPES,
+  ...ALLOWED_GIF_TYPES,
+  ...ALLOWED_VIDEO_TYPES,
 ] as const
 
 export const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024 // 5MB
-export const MAX_IMAGES_PER_POST = 4
+export const MAX_VIDEO_SIZE_BYTES = 20 * 1024 * 1024 // 20MB — kept small since
+// there's no transcoding pipeline and /api/media has no HTTP Range
+// passthrough guarantee (see app/api/media/route.ts).
 
+export const MAX_MEDIA_PER_POST = 4
+export const MAX_VIDEOS_PER_POST = 1
+
+/** Back-compat alias for existing callers/tests. */
+export const MAX_IMAGES_PER_POST = MAX_MEDIA_PER_POST
+
+export function getMediaTypeForMime(mime: string): MediaType | null {
+  if ((ALLOWED_GIF_TYPES as readonly string[]).includes(mime)) return "gif"
+  if ((ALLOWED_IMAGE_TYPES as readonly string[]).includes(mime)) return "image"
+  if ((ALLOWED_VIDEO_TYPES as readonly string[]).includes(mime)) return "video"
+  return null
+}
+
+export function isAllowedMediaType(type: string): boolean {
+  return (ALLOWED_MEDIA_TYPES as readonly string[]).includes(type)
+}
+
+/** @deprecated use isAllowedMediaType */
 export function isAllowedImageType(type: string): boolean {
-  return (ALLOWED_IMAGE_TYPES as readonly string[]).includes(type)
+  return (
+    (ALLOWED_IMAGE_TYPES as readonly string[]).includes(type) ||
+    (ALLOWED_GIF_TYPES as readonly string[]).includes(type)
+  )
 }
 
-export function isAllowedImageSize(size: number): boolean {
-  return size > 0 && size <= MAX_IMAGE_SIZE_BYTES
+export function maxSizeForMime(mime: string): number {
+  return (ALLOWED_VIDEO_TYPES as readonly string[]).includes(mime)
+    ? MAX_VIDEO_SIZE_BYTES
+    : MAX_IMAGE_SIZE_BYTES
 }
 
+/**
+ * Validates a single file before/at upload time. Used both by the
+ * composer (fast client-side feedback) and by /api/upload (the real
+ * security boundary — the client check is only a UX shortcut).
+ */
+export function validateMediaFile(file: {
+  type: string
+  size: number
+}): string | null {
+  const mediaType = getMediaTypeForMime(file.type)
+  if (!mediaType) {
+    return "Only JPEG, PNG, WebP, GIF images and MP4, WebM, or MOV videos are supported."
+  }
+  const maxSize = maxSizeForMime(file.type)
+  if (file.size <= 0 || file.size > maxSize) {
+    return mediaType === "video"
+      ? `Videos must be ${Math.round(maxSize / (1024 * 1024))}MB or smaller.`
+      : `Images and GIFs must be ${Math.round(maxSize / (1024 * 1024))}MB or smaller.`
+  }
+  return null
+}
+
+/**
+ * Validates a full attachment set for a post (server-side, in
+ * createPost) — videos can't be mixed with images/gifs and are
+ * capped at one per post, mirroring the composer's own attach rules
+ * so a crafted request can't bypass them.
+ */
+export function validateMediaAttachments(
+  media: MediaAttachment[],
+): string | null {
+  if (media.length > MAX_MEDIA_PER_POST) {
+    return `You can attach up to ${MAX_MEDIA_PER_POST} items per post.`
+  }
+  const videoCount = media.filter((m) => m.type === "video").length
+  if (videoCount > MAX_VIDEOS_PER_POST) {
+    return "You can only attach one video per post."
+  }
+  if (videoCount > 0 && media.length > videoCount) {
+    return "Videos can't be combined with images or GIFs in the same post."
+  }
+  return null
+}
+
+/** @deprecated use validateMediaFile */
 export function validateImageFile(file: {
   type: string
   size: number
 }): string | null {
-  if (!isAllowedImageType(file.type)) {
-    return "Only JPEG, PNG, WebP, and GIF images are supported."
-  }
-  if (!isAllowedImageSize(file.size)) {
-    return "Images must be 5MB or smaller."
-  }
-  return null
+  return validateMediaFile(file)
 }
