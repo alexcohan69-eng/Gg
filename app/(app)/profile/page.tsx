@@ -2,10 +2,17 @@ import type { Metadata } from "next"
 import { headers } from "next/headers"
 import { redirect } from "next/navigation"
 import { auth } from "@/lib/auth"
+import { getUserPosts } from "@/lib/posts"
 import { PageHeader } from "@/components/page-header"
+import { PostList } from "@/components/post-list"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
-import { CalendarIcon, LinkIcon, MapPinIcon } from "lucide-react"
+import {
+  CalendarIcon,
+  LinkIcon,
+  MapPinIcon,
+  MessageSquareTextIcon,
+} from "lucide-react"
 
 export const metadata: Metadata = {
   title: "Your profile",
@@ -36,6 +43,8 @@ export default async function ProfilePage() {
     month: "long",
     year: "numeric",
   })
+
+  const posts = await getUserPosts(user.id)
 
   return (
     <div className="flex flex-col">
@@ -127,8 +136,14 @@ export default async function ProfilePage() {
         </div>
       </div>
 
-      <div className="border-t border-border px-4 py-10 text-center text-sm text-muted-foreground">
-        Posts, replies, and media tabs arrive once the post system ships.
+      <div className="border-t border-border">
+        <PostList
+          posts={posts}
+          currentUserId={user.id}
+          emptyIcon={MessageSquareTextIcon}
+          emptyTitle="No posts yet"
+          emptyDescription="Anything you post will show up here."
+        />
       </div>
     </div>
   )
