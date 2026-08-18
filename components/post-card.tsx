@@ -1,6 +1,6 @@
 "use client"
 
-import { useTransition } from "react"
+import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import {
@@ -12,6 +12,14 @@ import {
   Trash2Icon,
 } from "lucide-react"
 import { deletePost } from "@/app/actions/posts"
+import {
+  bookmarkPost,
+  likePost,
+  removeBookmark,
+  repostPost,
+  undoRepost,
+  unlikePost,
+} from "@/app/actions/interactions"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import {
@@ -20,7 +28,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { getInitials, formatRelativeTime } from "@/lib/utils"
+import { cn, getInitials, formatRelativeTime } from "@/lib/utils"
 import type { FeedPost } from "@/lib/posts"
 
 /** Action-bar buttons that don't have a live feature behind them yet. */
@@ -39,6 +47,17 @@ export function PostCard({
   const [isDeleting, startDeleting] = useTransition()
   const isOwner = post.authorId === currentUserId
 
+  const [liked, setLiked] = useState(post.isLiked)
+  const [likeCount, setLikeCount] = useState(post.likeCount)
+  const [, startLikeTransition] = useTransition()
+
+  const [reposted, setReposted] = useState(post.isReposted)
+  const [repostCount, setRepostCount] = useState(post.repostCount)
+  const [, startRepostTransition] = useTransition()
+
+  const [bookmarked, setBookmarked] = useState(post.isBookmarked)
+  const [, startBookmarkTransition] = useTransition()
+
   function handleDelete() {
     startDeleting(async () => {
       const result = await deletePost(post.id)
@@ -48,6 +67,55 @@ export function PostCard({
       }
       toast.success("Post deleted")
       router.refresh()
+    })
+  }
+
+  function handleLikeToggle() {
+    const next = !liked
+    setLiked(next)
+    setLikeCount((count) => Math.max(0, count + (next ? 1 : -1)))
+
+    startLikeTransition(async () => {
+      const result = next ? await likePost(post.id) : await unlikePost(post.id)
+      if (!result.success) {
+        setLiked(!next)
+        setLikeCount((count) => Math.max(0, count + (next ? -1 : 1)))
+        toast.error(result.error ?? "Something went wrong.")
+      }
+    })
+  }
+
+  function handleRepostToggle() {
+    const next = !reposted
+    setReposted(next)
+    setRepostCount((count) => Math.max(0, count + (next ? 1 : -1)))
+
+    startRepostTransition(async () => {
+      const result = next ? await repostPost(post.id) : await undoRepost(post.id)
+      if (!result.success) {
+        setReposted(!next)
+        setRepostCount((count) => Math.max(0, count + (next ? -1 : 1)))
+        toast.error(result.error ?? "Something went wrong.")
+      } else {
+        toast.success(next ? "Reposted" : "Repost removed")
+      }
+    })
+  }
+
+  function handleBookmarkToggle() {
+    const next = !bookmarked
+    setBookmarked(next)
+
+    startBookmarkTransition(async () => {
+      const result = next
+        ? await bookmarkPost(post.id)
+        : await removeBookmark(post.id)
+      if (!result.success) {
+        setBookmarked(!next)
+        toast.error(result.error ?? "Something went wrong.")
+      } else {
+        toast.success(next ? "Added to bookmarks" : "Removed from bookmarks")
+      }
     })
   }
 
@@ -128,29 +196,41 @@ export function PostCard({
           <Button
             variant="ghost"
             size="sm"
-            className="gap-1.5 rounded-full hover:text-emerald-500"
-            onClick={() => comingSoon("Reposts")}
+            aria-pressed={reposted}
+            className={cn(
+              "gap-1.5 rounded-full hover:text-emerald-500",
+              reposted && "text-emerald-500",
+            )}
+            onClick={handleRepostToggle}
           >
             <Repeat2Icon />
-            {post.repostCount > 0 ? post.repostCount : null}
+            {repostCount > 0 ? repostCount : null}
           </Button>
           <Button
             variant="ghost"
             size="sm"
-            className="gap-1.5 rounded-full hover:text-rose-500"
-            onClick={() => comingSoon("Likes")}
+            aria-pressed={liked}
+            className={cn(
+              "gap-1.5 rounded-full hover:text-rose-500",
+              liked && "text-rose-500",
+            )}
+            onClick={handleLikeToggle}
           >
-            <HeartIcon />
-            {post.likeCount > 0 ? post.likeCount : null}
+            <HeartIcon fill={liked ? "currentColor" : "none"} />
+            {likeCount > 0 ? likeCount : null}
           </Button>
           <Button
             variant="ghost"
             size="icon-sm"
-            className="rounded-full hover:text-primary"
-            aria-label="Bookmark"
-            onClick={() => comingSoon("Bookmarks")}
+            aria-pressed={bookmarked}
+            aria-label={bookmarked ? "Remove bookmark" : "Bookmark"}
+            className={cn(
+              "rounded-full hover:text-primary",
+              bookmarked && "text-primary",
+            )}
+            onClick={handleBookmarkToggle}
           >
-            <BookmarkIcon />
+            <BookmarkIcon fill={bookmarked ? "currentColor" : "none"} />
           </Button>
         </div>
       </div>

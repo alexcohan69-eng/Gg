@@ -1,11 +1,12 @@
-import { and, desc, eq } from "drizzle-orm"
+import { and, desc, eq, sql } from "drizzle-orm"
 import { db } from "@/lib/db"
-import { posts, user } from "@/lib/db/schema"
+import { bookmarks, likes, posts, reposts, user } from "@/lib/db/schema"
 
 /**
- * A post joined with its author's public profile fields. This shape is
- * shared by the home feed and the profile posts tab so `PostList` /
- * `PostCard` only need to know about one type.
+ * A post joined with its author's public profile fields plus the
+ * viewer's interaction state (like/bookmark/repost). This shape is
+ * shared by the home feed, profile posts tab, and bookmarks tab so
+ * `PostList` / `PostCard` only need to know about one type.
  */
 export type FeedPost = {
   id: string
@@ -19,11 +20,14 @@ export type FeedPost = {
   authorName: string
   authorUsername: string | null
   authorImage: string | null
+  isLiked: boolean
+  isBookmarked: boolean
+  isReposted: boolean
 }
 
 const FEED_PAGE_SIZE = 30
 
-const postSelection = {
+const baseSelection = {
   id: posts.id,
   content: posts.content,
   imageUrls: posts.imageUrls,
@@ -35,6 +39,24 @@ const postSelection = {
   authorName: user.name,
   authorUsername: user.username,
   authorImage: user.image,
+} as const
+
+/**
+ * Left-joins the viewer's own like/repost rows onto a posts query so
+ * each row carries that viewer's interaction state. The unique
+ * (userId, postId) index on each table guarantees at most one matching
+ * row, so this never fans out the result set.
+ */
+function withLikeAndRepostJoins(query: any, viewerId: string) {
+  return query
+    .leftJoin(
+      likes,
+      and(eq(likes.postId, posts.id), eq(likes.userId, viewerId)),
+    )
+    .leftJoin(
+      reposts,
+      and(eq(reposts.postId, posts.id), eq(reposts.userId, viewerId)),
+    )
 }
 
 /**
@@ -43,12 +65,24 @@ const postSelection = {
  * seam to add a follows-scoped query once that ships.
  */
 export async function getFeedPosts(
+  viewerId: string,
   limit = FEED_PAGE_SIZE,
 ): Promise<FeedPost[]> {
-  return db
-    .select(postSelection)
+  const query = db
+    .select({
+      ...baseSelection,
+      isLiked: sql<boolean>`${likes.id} is not null`,
+      isBookmarked: sql<boolean>`${bookmarks.id} is not null`,
+      isReposted: sql<boolean>`${reposts.id} is not null`,
+    })
     .from(posts)
     .innerJoin(user, eq(posts.userId, user.id))
+    .leftJoin(
+      bookmarks,
+      and(eq(bookmarks.postId, posts.id), eq(bookmarks.userId, viewerId)),
+    )
+
+  return withLikeAndRepostJoins(query, viewerId)
     .where(eq(posts.isReply, false))
     .orderBy(desc(posts.createdAt))
     .limit(limit)
@@ -57,13 +91,52 @@ export async function getFeedPosts(
 /** Top-level posts authored by a single user, newest first. */
 export async function getUserPosts(
   userId: string,
+  viewerId: string,
   limit = FEED_PAGE_SIZE,
 ): Promise<FeedPost[]> {
-  return db
-    .select(postSelection)
+  const query = db
+    .select({
+      ...baseSelection,
+      isLiked: sql<boolean>`${likes.id} is not null`,
+      isBookmarked: sql<boolean>`${bookmarks.id} is not null`,
+      isReposted: sql<boolean>`${reposts.id} is not null`,
+    })
     .from(posts)
     .innerJoin(user, eq(posts.userId, user.id))
+    .leftJoin(
+      bookmarks,
+      and(eq(bookmarks.postId, posts.id), eq(bookmarks.userId, viewerId)),
+    )
+
+  return withLikeAndRepostJoins(query, viewerId)
     .where(and(eq(posts.userId, userId), eq(posts.isReply, false)))
     .orderBy(desc(posts.createdAt))
+    .limit(limit)
+}
+
+/**
+ * Posts the viewer has bookmarked, newest bookmark first. The base
+ * table here IS the viewer's bookmarks (already filtered to their own
+ * rows), so `isBookmarked` is trivially true — no need to re-join
+ * `bookmarks` a second time.
+ */
+export async function getBookmarkedPosts(
+  viewerId: string,
+  limit = FEED_PAGE_SIZE,
+): Promise<FeedPost[]> {
+  const query = db
+    .select({
+      ...baseSelection,
+      isLiked: sql<boolean>`${likes.id} is not null`,
+      isBookmarked: sql<boolean>`true`,
+      isReposted: sql<boolean>`${reposts.id} is not null`,
+    })
+    .from(bookmarks)
+    .innerJoin(posts, eq(bookmarks.postId, posts.id))
+    .innerJoin(user, eq(posts.userId, user.id))
+
+  return withLikeAndRepostJoins(query, viewerId)
+    .where(eq(bookmarks.userId, viewerId))
+    .orderBy(desc(bookmarks.createdAt))
     .limit(limit)
 }
