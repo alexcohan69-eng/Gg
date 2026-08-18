@@ -16,7 +16,13 @@ export async function generateMetadata({
   params: Promise<{ id: string }>
 }): Promise<Metadata> {
   const { id } = await params
-  const post = await getPostById(id, id).catch(() => null)
+
+  const session = await auth.api.getSession({ headers: await headers() })
+  if (!session?.user) {
+    return { title: "Post" }
+  }
+
+  const post = await getPostById(id, session.user.id).catch(() => null)
 
   if (!post) {
     return { title: "Post" }
