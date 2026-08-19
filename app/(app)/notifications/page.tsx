@@ -1,5 +1,12 @@
 import type { Metadata } from "next"
+import { headers } from "next/headers"
+import { redirect } from "next/navigation"
+import { BellIcon } from "lucide-react"
+import { auth } from "@/lib/auth"
+import { getNotifications } from "@/lib/notifications"
 import { PageHeader } from "@/components/page-header"
+import { NotificationItem } from "@/components/notification-item"
+import { MarkAllReadButton } from "@/components/mark-all-read-button"
 import {
   Empty,
   EmptyHeader,
@@ -7,30 +14,45 @@ import {
   EmptyTitle,
   EmptyDescription,
 } from "@/components/ui/empty"
-import { BellIcon } from "lucide-react"
 
 export const metadata: Metadata = {
   title: "Notifications",
 }
 
-export default function NotificationsPage() {
+export default async function NotificationsPage() {
+  const session = await auth.api.getSession({ headers: await headers() })
+  if (!session?.user) redirect("/sign-in")
+
+  const notifications = await getNotifications(session.user.id)
+  const hasUnread = notifications.some((notification) => !notification.isRead)
+
   return (
     <div className="flex flex-col">
-      <PageHeader title="Notifications" />
-      <div className="p-4">
-        <Empty>
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <BellIcon />
-            </EmptyMedia>
-            <EmptyTitle>No notifications yet</EmptyTitle>
-            <EmptyDescription>
-              Likes, replies, and new followers will show up here once the
-              notification system ships.
-            </EmptyDescription>
-          </EmptyHeader>
-        </Empty>
-      </div>
+      <PageHeader title="Notifications">
+        {hasUnread ? <MarkAllReadButton /> : null}
+      </PageHeader>
+
+      {notifications.length === 0 ? (
+        <div className="p-4">
+          <Empty>
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <BellIcon />
+              </EmptyMedia>
+              <EmptyTitle>No notifications yet</EmptyTitle>
+              <EmptyDescription>
+                Likes, replies, reposts, and new followers will show up here.
+              </EmptyDescription>
+            </EmptyHeader>
+          </Empty>
+        </div>
+      ) : (
+        <div>
+          {notifications.map((notification) => (
+            <NotificationItem key={notification.id} notification={notification} />
+          ))}
+        </div>
+      )}
     </div>
   )
 }

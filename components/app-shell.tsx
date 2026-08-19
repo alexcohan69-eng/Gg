@@ -26,6 +26,20 @@ type ShellUser = {
   username?: string | null
 }
 
+/** Small unread-count dot rendered on top of a nav icon. Caps the
+ * visible label at "9+" so it never wraps or crowds the icon. */
+function NavBadge({ count }: { count: number }) {
+  if (count <= 0) return null
+  return (
+    <span
+      className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-none text-primary-foreground"
+      aria-hidden="true"
+    >
+      {count > 9 ? "9+" : count}
+    </span>
+  )
+}
+
 function initials(name: string) {
   return name
     .split(" ")
@@ -41,9 +55,11 @@ function isActive(pathname: string, href: string) {
 
 export function AppShell({
   user,
+  unreadNotificationsCount = 0,
   children,
 }: {
   user: ShellUser
+  unreadNotificationsCount?: number
   children: React.ReactNode
 }) {
   const pathname = usePathname()
@@ -78,7 +94,12 @@ export function AppShell({
                     active && "bg-accent text-accent-foreground font-semibold",
                   )}
                 >
-                  <item.icon className="size-6 shrink-0" aria-hidden="true" />
+                  <span className="relative shrink-0">
+                    <item.icon className="size-6" aria-hidden="true" />
+                    {item.href === "/notifications" ? (
+                      <NavBadge count={unreadNotificationsCount} />
+                    ) : null}
+                  </span>
                   <span className="hidden lg:inline">{item.label}</span>
                 </Link>
               )
@@ -121,7 +142,12 @@ export function AppShell({
                             "bg-accent text-accent-foreground font-semibold",
                         )}
                       >
-                        <item.icon className="size-6 shrink-0" aria-hidden="true" />
+                        <span className="relative shrink-0">
+                          <item.icon className="size-6" aria-hidden="true" />
+                          {item.href === "/notifications" ? (
+                            <NavBadge count={unreadNotificationsCount} />
+                          ) : null}
+                        </span>
                         {item.label}
                       </Link>
                     )
@@ -172,7 +198,12 @@ export function AppShell({
                   active && "text-primary",
                 )}
               >
-                <item.icon className="size-6" aria-hidden="true" />
+                <span className="relative">
+                  <item.icon className="size-6" aria-hidden="true" />
+                  {item.href === "/notifications" ? (
+                    <NavBadge count={unreadNotificationsCount} />
+                  ) : null}
+                </span>
               </Link>
             )
           })}

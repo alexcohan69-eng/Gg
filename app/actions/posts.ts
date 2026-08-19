@@ -7,6 +7,7 @@ import { and, eq, sql } from "drizzle-orm"
 import { auth } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { posts } from "@/lib/db/schema"
+import { createNotification } from "@/lib/notifications"
 import {
   MAX_MEDIA_PER_POST,
   validateMediaAttachments,
@@ -113,9 +114,10 @@ export async function createPost(
     }
   }
 
+  let parentAuthorId: string | null = null
   if (replyToId) {
     const [parent] = await db
-      .select({ id: posts.id })
+      .select({ id: posts.id, userId: posts.userId })
       .from(posts)
       .where(eq(posts.id, replyToId))
       .limit(1)
@@ -123,11 +125,14 @@ export async function createPost(
     if (!parent) {
       return { success: false, error: "Original post no longer exists." }
     }
+    parentAuthorId = parent.userId
   }
+
+  const postId = crypto.randomUUID()
 
   await db.transaction(async (tx) => {
     await tx.insert(posts).values({
-      id: crypto.randomUUID(),
+      id: postId,
       userId,
       content,
       media,
@@ -142,6 +147,17 @@ export async function createPost(
         .where(eq(posts.id, replyToId))
     }
   })
+
+  // Notification links to the new reply itself — /post/[id] renders
+  // any post as its own thread root, reply or not.
+  if (replyToId && parentAuthorId) {
+    await createNotification({
+      recipientId: parentAuthorId,
+      actorId: userId,
+      type: "reply",
+      postId,
+    })
+  }
 
   revalidatePath("/home")
   revalidatePath("/profile")
