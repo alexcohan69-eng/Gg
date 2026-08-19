@@ -125,3 +125,27 @@ export function validateImageFile(file: {
 }): string | null {
   return validateMediaFile(file)
 }
+
+/** Avatar/banner uploads allow images and GIFs, but never video. */
+export const ALLOWED_PROFILE_IMAGE_TYPES = [
+  ...ALLOWED_IMAGE_TYPES,
+  ...ALLOWED_GIF_TYPES,
+] as const
+
+/**
+ * Validates an avatar/banner upload. Shared by the profile image
+ * editor (client, for fast feedback) and /api/upload/profile-image
+ * (server, the real gate) so the two rule sets can't drift apart.
+ */
+export function validateProfileImageFile(file: {
+  type: string
+  size: number
+}): string | null {
+  if (!(ALLOWED_PROFILE_IMAGE_TYPES as readonly string[]).includes(file.type)) {
+    return "Only JPEG, PNG, WebP, and GIF images are supported."
+  }
+  if (file.size <= 0 || file.size > MAX_IMAGE_SIZE_BYTES) {
+    return `Images must be ${Math.round(MAX_IMAGE_SIZE_BYTES / (1024 * 1024))}MB or smaller.`
+  }
+  return null
+}

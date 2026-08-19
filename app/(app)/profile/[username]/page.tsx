@@ -6,7 +6,7 @@ import { getUserPosts } from "@/lib/posts"
 import { getFollowCounts, getProfileByIdentifier, isFollowing } from "@/lib/follows"
 import { getBlockState } from "@/lib/blocks"
 import { profileHref } from "@/lib/utils"
-import { PageHeader } from "@/components/page-header"
+import { ProfileStickyHeader } from "@/components/profile-sticky-header"
 import { BackButton } from "@/components/back-button"
 import { ProfileHeader } from "@/components/profile-header"
 import { PostList } from "@/components/post-list"
@@ -63,9 +63,9 @@ export default async function PublicProfilePage({
 
   return (
     <div className="flex flex-col">
-      <PageHeader
-        title={profile.name}
-        description={`@${profile.username ?? "user"}`}
+      <ProfileStickyHeader
+        name={profile.name}
+        username={profile.username ?? "user"}
         leading={<BackButton />}
       />
 

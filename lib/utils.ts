@@ -24,6 +24,11 @@ export function profileHref(u: { username: string | null; id: string }) {
   return `/profile/${u.username ?? u.id}`
 }
 
+/** Appends "s" to `word` unless `count` is exactly 1, e.g. pluralize(1, "Follower") -> "Follower". */
+export function pluralize(count: number, word: string) {
+  return count === 1 ? word : `${word}s`
+}
+
 /** Twitter-style relative timestamp: 5s, 12m, 3h, 4d, then a short date. */
 export function formatRelativeTime(date: Date | string) {
   const value = typeof date === 'string' ? new Date(date) : date

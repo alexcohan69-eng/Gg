@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { FollowButton } from "@/components/follow-button"
 import { MessageButton } from "@/components/message-button"
 import { BlockButton } from "@/components/block-button"
-import { getInitials } from "@/lib/utils"
+import { getInitials, pluralize } from "@/lib/utils"
 
 /**
  * Banner/avatar/bio block shared by the self profile page (`/profile`)
@@ -129,6 +129,15 @@ export function ProfileHeader({
           <p className="text-sm text-muted-foreground">@{username ?? "user"}</p>
         </div>
 
+        {/* Marks where the name/handle above scrolls out from under the
+            sticky header, so ProfileStickyHeader knows when to reveal
+            its own copy instead of showing both at once. */}
+        <div
+          id="profile-identity-sentinel"
+          className="h-px w-full"
+          aria-hidden="true"
+        />
+
         {bio ? (
           <p className="mt-3 max-w-prose text-sm leading-relaxed text-foreground">
             {bio}
@@ -180,7 +189,9 @@ export function ProfileHeader({
             <strong className="font-semibold text-foreground">
               {followerCount}
             </strong>{" "}
-            <span className="text-muted-foreground">Followers</span>
+            <span className="text-muted-foreground">
+              {pluralize(followerCount, "Follower")}
+            </span>
           </Link>
         </div>
       </div>

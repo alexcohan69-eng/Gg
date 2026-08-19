@@ -83,3 +83,30 @@ export async function updateProfile(
 
   return { success: true }
 }
+
+/**
+ * Persists the URL of an already-uploaded avatar or banner image (or
+ * clears it back to the initials/gradient fallback when `url` is
+ * null). The upload itself happens in /api/upload/profile-image —
+ * this just writes the resulting URL onto the user row, mirroring
+ * updateProfile's shape so the editor can reuse the same result type.
+ */
+export async function updateProfileImage(
+  kind: "avatar" | "banner",
+  url: string | null,
+): Promise<UpdateProfileResult> {
+  const userId = await getUserId()
+
+  await db
+    .update(userTable)
+    .set({
+      ...(kind === "avatar" ? { image: url } : { bannerImage: url }),
+      updatedAt: new Date(),
+    })
+    .where(eq(userTable.id, userId))
+
+  revalidatePath("/profile")
+  revalidatePath("/settings")
+
+  return { success: true }
+}
