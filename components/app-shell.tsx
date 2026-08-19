@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation"
 import { Menu, LogOut } from "lucide-react"
 import { Logo } from "@/components/logo"
 import { UserMenu } from "@/components/user-menu"
+import { NotificationBellBadge } from "@/components/notification-bell-badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import {
@@ -78,7 +79,12 @@ export function AppShell({
                     active && "bg-accent text-accent-foreground font-semibold",
                   )}
                 >
-                  <item.icon className="size-6 shrink-0" aria-hidden="true" />
+                  <span className="relative inline-flex shrink-0">
+                    <item.icon className="size-6" aria-hidden="true" />
+                    {item.href === "/notifications" ? (
+                      <NotificationBellBadge />
+                    ) : null}
+                  </span>
                   <span className="hidden lg:inline">{item.label}</span>
                 </Link>
               )
@@ -121,7 +127,12 @@ export function AppShell({
                             "bg-accent text-accent-foreground font-semibold",
                         )}
                       >
-                        <item.icon className="size-6 shrink-0" aria-hidden="true" />
+                        <span className="relative inline-flex shrink-0">
+                          <item.icon className="size-6" aria-hidden="true" />
+                          {item.href === "/notifications" ? (
+                            <NotificationBellBadge />
+                          ) : null}
+                        </span>
                         {item.label}
                       </Link>
                     )
@@ -172,7 +183,12 @@ export function AppShell({
                   active && "text-primary",
                 )}
               >
-                <item.icon className="size-6" aria-hidden="true" />
+                <span className="relative inline-flex">
+                  <item.icon className="size-6" aria-hidden="true" />
+                  {item.href === "/notifications" ? (
+                    <NotificationBellBadge />
+                  ) : null}
+                </span>
               </Link>
             )
           })}
