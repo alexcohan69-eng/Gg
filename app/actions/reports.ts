@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm"
 import { getSessionWithRetry } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { posts, reports } from "@/lib/db/schema"
+import { logActionError } from "@/lib/log-action-error"
 import { REPORT_REASON_VALUES, type ReportReason } from "@/lib/moderation"
 
 async function getUserId() {
@@ -58,7 +59,8 @@ export async function reportPost(
       .onConflictDoNothing()
 
     return { success: true }
-  } catch {
+  } catch (error) {
+    logActionError("reportPost", error, { postId })
     return { success: false, error: "Couldn't submit report." }
   }
 }
@@ -88,7 +90,8 @@ export async function reportUser(
       .onConflictDoNothing()
 
     return { success: true }
-  } catch {
+  } catch (error) {
+    logActionError("reportUser", error, { targetUserId })
     return { success: false, error: "Couldn't submit report." }
   }
 }

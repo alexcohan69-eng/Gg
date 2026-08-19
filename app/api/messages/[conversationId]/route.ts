@@ -1,6 +1,7 @@
 import { headers } from "next/headers"
 import { NextResponse } from "next/server"
 import { getSessionWithRetry } from "@/lib/auth"
+import { logActionError } from "@/lib/log-action-error"
 import {
   getConversationForViewer,
   getMessages,
@@ -46,7 +47,10 @@ export async function GET(
 
     return NextResponse.json({ messages })
   } catch (error) {
-    console.error("[v0] Failed to load thread messages:", error)
+    logActionError("getThreadMessages", error, {
+      userId: session.user.id,
+      conversationId,
+    })
     return NextResponse.json(
       { error: "Couldn't load messages." },
       { status: 500 },

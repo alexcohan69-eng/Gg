@@ -2,6 +2,7 @@ import { put } from "@vercel/blob"
 import { headers } from "next/headers"
 import { NextResponse, type NextRequest } from "next/server"
 import { getSessionWithRetry } from "@/lib/auth"
+import { logActionError } from "@/lib/log-action-error"
 import { getMediaTypeForMime, validateMediaFile } from "@/lib/media"
 
 /**
@@ -54,7 +55,7 @@ export async function POST(request: NextRequest) {
       type: mediaType,
     })
   } catch (error) {
-    console.error("[v0] Blob upload failed:", error)
+    logActionError("uploadMedia", error, { userId: session.user.id })
     return NextResponse.json(
       { error: "Upload failed. Please try again." },
       { status: 500 },

@@ -1,6 +1,7 @@
 import { headers } from "next/headers"
 import { NextResponse } from "next/server"
 import { getSessionWithRetry } from "@/lib/auth"
+import { logActionError } from "@/lib/log-action-error"
 import { getConversations } from "@/lib/messages"
 
 /**
@@ -18,7 +19,7 @@ export async function GET() {
     const conversations = await getConversations(session.user.id)
     return NextResponse.json({ conversations })
   } catch (error) {
-    console.error("[v0] Failed to load conversations:", error)
+    logActionError("getConversations", error, { userId: session.user.id })
     return NextResponse.json(
       { error: "Couldn't load conversations." },
       { status: 500 },
