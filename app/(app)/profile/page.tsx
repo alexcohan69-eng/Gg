@@ -4,6 +4,7 @@ import { redirect } from "next/navigation"
 import { auth } from "@/lib/auth"
 import { getUserPosts } from "@/lib/posts"
 import { getFollowCounts } from "@/lib/follows"
+import { loadMoreProfilePosts } from "@/app/actions/feed"
 import { PageHeader } from "@/components/page-header"
 import { ProfileHeader } from "@/components/profile-header"
 import { PostList } from "@/components/post-list"
@@ -63,6 +64,7 @@ export default async function ProfilePage() {
           emptyIcon={MessageSquareTextIcon}
           emptyTitle="No posts yet"
           emptyDescription="Anything you post will show up here."
+          loadMore={loadMoreProfilePosts.bind(null, user.id)}
         />
       </div>
     </div>

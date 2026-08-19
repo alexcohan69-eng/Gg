@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation"
 import { auth } from "@/lib/auth"
 import { getUserPosts } from "@/lib/posts"
 import { getFollowCounts, getProfileByIdentifier, isFollowing } from "@/lib/follows"
+import { loadMoreProfilePosts } from "@/app/actions/feed"
 import { profileHref } from "@/lib/utils"
 import { PageHeader } from "@/components/page-header"
 import { BackButton } from "@/components/back-button"
@@ -89,6 +90,7 @@ export default async function PublicProfilePage({
           emptyIcon={MessageSquareTextIcon}
           emptyTitle="No posts yet"
           emptyDescription={`${profile.name} hasn't posted anything yet.`}
+          loadMore={loadMoreProfilePosts.bind(null, profile.id)}
         />
       </div>
     </div>

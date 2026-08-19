@@ -3,6 +3,7 @@ import { headers } from "next/headers"
 import { redirect } from "next/navigation"
 import { auth } from "@/lib/auth"
 import { getBookmarkedPosts } from "@/lib/posts"
+import { loadMoreBookmarks } from "@/app/actions/feed"
 import { PageHeader } from "@/components/page-header"
 import { PostList } from "@/components/post-list"
 import { BookmarkIcon } from "lucide-react"
@@ -26,6 +27,7 @@ export default async function BookmarksPage() {
         emptyIcon={BookmarkIcon}
         emptyTitle="Nothing saved yet"
         emptyDescription="Posts you bookmark will be collected here."
+        loadMore={loadMoreBookmarks}
       />
     </div>
   )
