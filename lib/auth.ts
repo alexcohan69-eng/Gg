@@ -64,21 +64,40 @@ export const auth = betterAuth({
 
 /**
  * `auth.api.getSession` hits the database, so a transient Aurora
- * hiccup (cold-start connection delay, a dropped connection, etc.)
- * throws instead of resolving. That's called from the root `(app)`
- * layout on every authenticated page, so letting it throw would take
- * the whole app down to the error boundary on a hiccup that a retry
- * would likely clear. Degrade to "no session" instead — the caller's
- * existing unauthenticated path (redirect to sign-in) already handles
- * that safely, and the user can simply retry.
+ * hiccup (a dropped/half-open pooled connection, a brief cold-start
+ * blip, etc.) can throw instead of resolving. This is called from the
+ * root `(app)` layout on every authenticated page, so a single failed
+ * attempt should not take the whole app down.
+ *
+ * IMPORTANT: we do NOT swallow the error into a `null` "no session"
+ * result. Doing so would force-sign-out a logged-in user on a purely
+ * transient failure (the `(app)` layout redirects to `/sign-in` when
+ * the session is falsy). Instead we retry a bounded number of times
+ * and, if it still fails, re-throw so the Next.js error boundary shows
+ * a retryable error rather than an incorrect signed-out state.
+ *
+ * A genuine "not logged in" resolves to `null` WITHOUT throwing, so
+ * real logouts still redirect correctly and are never retried.
  */
-export async function getSessionSafe(
+export async function getSessionWithRetry(
   ...args: Parameters<typeof auth.api.getSession>
 ) {
-  try {
-    return await auth.api.getSession(...args)
-  } catch (error) {
-    console.error("[v0] getSession failed, treating as signed out:", error)
-    return null
+  const maxAttempts = 2
+  let lastError: unknown
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await auth.api.getSession(...args)
+    } catch (error) {
+      lastError = error
+      console.error(
+        `[v0] getSession attempt ${attempt}/${maxAttempts} failed:`,
+        error,
+      )
+      if (attempt < maxAttempts) {
+        await new Promise((resolve) => setTimeout(resolve, 250))
+      }
+    }
   }
+  // Surface the real failure — never masquerade a DB error as signed out.
+  throw lastError
 }

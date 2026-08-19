@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation"
 import { headers } from "next/headers"
-import { getSessionSafe } from "@/lib/auth"
+import { getSessionWithRetry } from "@/lib/auth"
 import { getUnreadNotificationCount } from "@/lib/notifications"
 import { getUnreadMessageCount } from "@/lib/messages"
 import { AppShell } from "@/components/app-shell"
@@ -10,7 +10,7 @@ export default async function AppLayout({
 }: {
   children: React.ReactNode
 }) {
-  const session = await getSessionSafe({ headers: await headers() })
+  const session = await getSessionWithRetry({ headers: await headers() })
 
   if (!session?.user) {
     redirect("/sign-in")
