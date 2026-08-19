@@ -1,7 +1,7 @@
 "use client"
 
 import { useRef, useState, useTransition, type KeyboardEvent } from "react"
-import { useRouter } from "next/navigation"
+import { mutate } from "swr"
 import { toast } from "sonner"
 import { SendIcon } from "lucide-react"
 import { sendMessage } from "@/app/actions/messages"
@@ -12,7 +12,6 @@ import { Spinner } from "@/components/ui/spinner"
 const MAX_MESSAGE_LENGTH = 2000
 
 export function MessageComposer({ conversationId }: { conversationId: string }) {
-  const router = useRouter()
   const [content, setContent] = useState("")
   const [isPending, startTransition] = useTransition()
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -31,7 +30,12 @@ export function MessageComposer({ conversationId }: { conversationId: string }) 
         return
       }
       setContent("")
-      router.refresh()
+      // Revalidate the thread and inbox SWR caches directly instead of
+      // a full-page router.refresh() — both this thread and the inbox
+      // list are now polling clients, so nudging their cache keys is
+      // enough to reflect the new message immediately.
+      mutate(`/api/messages/${conversationId}`)
+      mutate("/api/messages")
       textareaRef.current?.focus()
     })
   }

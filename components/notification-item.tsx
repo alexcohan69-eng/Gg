@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react"
 import Link from "next/link"
+import { mutate } from "swr"
 import {
   HeartIcon,
   MessageCircleIcon,
@@ -66,7 +67,13 @@ export function NotificationItem({
     setIsRead(true)
     startTransition(async () => {
       const result = await markNotificationRead(notification.id)
-      if (!result.success) setIsRead(false)
+      if (!result.success) {
+        setIsRead(false)
+        return
+      }
+      // Nudge the nav badge down immediately instead of waiting for
+      // its next poll tick.
+      mutate("/api/badges")
     })
   }
 

@@ -11,7 +11,7 @@ import {
 import { getInitials, profileHref } from "@/lib/utils"
 import { BackButton } from "@/components/back-button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { MessageThread } from "@/components/message-thread"
+import { MessageThreadLive } from "@/components/message-thread-live"
 import { MessageComposer } from "@/components/message-composer"
 
 export async function generateMetadata({
@@ -89,8 +89,9 @@ export default async function ConversationPage({
         </Link>
       </header>
 
-      <MessageThread
-        messages={messages}
+      <MessageThreadLive
+        conversationId={conversationId}
+        initialMessages={messages}
         currentUserId={session.user.id}
         otherUser={otherUser}
       />
