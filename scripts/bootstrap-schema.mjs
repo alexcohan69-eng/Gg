@@ -157,6 +157,10 @@ const statements = [
   `create index if not exists notifications_userId_createdAt_idx on "notifications" ("userId", "createdAt" desc)`,
   `create index if not exists notifications_userId_isRead_idx on "notifications" ("userId", "isRead")`,
 
+  // "user1Id"/"user2Id" are always stored with the smaller id first
+  // (see sortPair in lib/messages.ts), so a single unique index on the
+  // pair both prevents duplicate conversations and backs the
+  // getOrCreateConversation lookup — no OR-based query needed there.
   `create table if not exists "conversations" (
     id text primary key,
     "user1Id" text not null,
@@ -164,6 +168,13 @@ const statements = [
     "lastMessageAt" timestamp not null default now(),
     "createdAt" timestamp not null default now()
   )`,
+  `create unique index if not exists conversations_user_pair_uidx on "conversations" ("user1Id", "user2Id")`,
+  // Composite indexes (rather than plain single-column ones) so the
+  // inbox query's "conversations for this user, newest first" can use
+  // the index for both the equality filter and the ORDER BY.
+  `create index if not exists conversations_user1Id_lastMessageAt_idx on "conversations" ("user1Id", "lastMessageAt" desc)`,
+  `create index if not exists conversations_user2Id_lastMessageAt_idx on "conversations" ("user2Id", "lastMessageAt" desc)`,
+
   `create table if not exists "messages" (
     id text primary key,
     "conversationId" text not null,
@@ -172,6 +183,10 @@ const statements = [
     "isRead" boolean not null default false,
     "createdAt" timestamp not null default now()
   )`,
+  `create index if not exists messages_conversationId_createdAt_idx on "messages" ("conversationId", "createdAt")`,
+  // Backs the inbox's per-conversation unread count (messages from the
+  // other participant that this viewer hasn't read yet).
+  `create index if not exists messages_conversationId_isRead_idx on "messages" ("conversationId", "isRead")`,
 ]
 
 const client = await pool.connect()

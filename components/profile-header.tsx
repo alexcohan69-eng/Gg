@@ -3,6 +3,7 @@ import { CalendarIcon, LinkIcon, MapPinIcon } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { FollowButton } from "@/components/follow-button"
+import { MessageButton } from "@/components/message-button"
 import { getInitials } from "@/lib/utils"
 
 /**
@@ -79,13 +80,15 @@ export function ProfileHeader({
               Edit profile
             </Button>
           ) : (
-            <FollowButton
-              targetUserId={targetUserId!}
-              initialIsFollowing={isFollowing!}
-              profileIdentifier={profileIdentifier}
-              size="default"
-              className="mt-10 sm:mt-12"
-            />
+            <div className="mt-10 flex items-center gap-2 sm:mt-12">
+              <MessageButton targetUserId={targetUserId!} />
+              <FollowButton
+                targetUserId={targetUserId!}
+                initialIsFollowing={isFollowing!}
+                profileIdentifier={profileIdentifier}
+                size="default"
+              />
+            </div>
           )}
         </div>
 

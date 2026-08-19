@@ -53,13 +53,25 @@ function isActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`)
 }
 
+function badgeCountForHref(
+  href: string,
+  unreadNotificationsCount: number,
+  unreadMessagesCount: number,
+) {
+  if (href === "/notifications") return unreadNotificationsCount
+  if (href === "/messages") return unreadMessagesCount
+  return 0
+}
+
 export function AppShell({
   user,
   unreadNotificationsCount = 0,
+  unreadMessagesCount = 0,
   children,
 }: {
   user: ShellUser
   unreadNotificationsCount?: number
+  unreadMessagesCount?: number
   children: React.ReactNode
 }) {
   const pathname = usePathname()
@@ -96,9 +108,13 @@ export function AppShell({
                 >
                   <span className="relative shrink-0">
                     <item.icon className="size-6" aria-hidden="true" />
-                    {item.href === "/notifications" ? (
-                      <NavBadge count={unreadNotificationsCount} />
-                    ) : null}
+                    <NavBadge
+                      count={badgeCountForHref(
+                        item.href,
+                        unreadNotificationsCount,
+                        unreadMessagesCount,
+                      )}
+                    />
                   </span>
                   <span className="hidden lg:inline">{item.label}</span>
                 </Link>
@@ -144,9 +160,13 @@ export function AppShell({
                       >
                         <span className="relative shrink-0">
                           <item.icon className="size-6" aria-hidden="true" />
-                          {item.href === "/notifications" ? (
-                            <NavBadge count={unreadNotificationsCount} />
-                          ) : null}
+                          <NavBadge
+                            count={badgeCountForHref(
+                              item.href,
+                              unreadNotificationsCount,
+                              unreadMessagesCount,
+                            )}
+                          />
                         </span>
                         {item.label}
                       </Link>
@@ -200,9 +220,13 @@ export function AppShell({
               >
                 <span className="relative">
                   <item.icon className="size-6" aria-hidden="true" />
-                  {item.href === "/notifications" ? (
-                    <NavBadge count={unreadNotificationsCount} />
-                  ) : null}
+                  <NavBadge
+                    count={badgeCountForHref(
+                      item.href,
+                      unreadNotificationsCount,
+                      unreadMessagesCount,
+                    )}
+                  />
                 </span>
               </Link>
             )
