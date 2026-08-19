@@ -47,10 +47,16 @@ export default async function PostDetailPage({
   const session = await getSessionWithRetry({ headers: await headers() })
   if (!session?.user) redirect("/sign-in")
 
-  const post = await getPostById(id, session.user.id)
+  // `getPostById` and `getBlockedUserIds` don't depend on each
+  // other's result, so resolve them together instead of one after
+  // the other — `getPostReplies` still has to wait on the blocked-id
+  // set since it uses it to filter authors.
+  const [post, blockedUserIds] = await Promise.all([
+    getPostById(id, session.user.id),
+    getBlockedUserIds(session.user.id),
+  ])
   if (!post) notFound()
 
-  const blockedUserIds = await getBlockedUserIds(session.user.id)
   const replies = await getPostReplies(id, session.user.id, blockedUserIds)
 
   return (

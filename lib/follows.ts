@@ -1,3 +1,4 @@
+import { cache } from "react"
 import { and, desc, eq, notInArray, sql } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { follows, user } from "@/lib/db/schema"
@@ -41,8 +42,13 @@ const profileSelection = {
  * identifier used in profile URLs — falling back to the raw user id.
  * Username is optional at sign-up, so posts authored before a user
  * sets one still need a working profile link; those links use the id.
+ *
+ * Wrapped in `cache()` because the public profile page's
+ * `generateMetadata` and the page body both look up the same
+ * identifier once per request — memoizing collapses that back down to
+ * a single query.
  */
-export async function getProfileByIdentifier(
+export const getProfileByIdentifier = cache(async function getProfileByIdentifier(
   identifier: string,
 ): Promise<ProfileUser | null> {
   const byUsername = await db
@@ -60,7 +66,7 @@ export async function getProfileByIdentifier(
     .limit(1)
 
   return byId[0] ?? null
-}
+})
 
 export async function getFollowCounts(userId: string) {
   const [followerRows, followingRows] = await Promise.all([

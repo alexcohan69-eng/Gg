@@ -1,3 +1,4 @@
+import { cache } from "react"
 import { betterAuth } from "better-auth"
 import { pool } from "@/lib/db"
 
@@ -78,8 +79,19 @@ export const auth = betterAuth({
  *
  * A genuine "not logged in" resolves to `null` WITHOUT throwing, so
  * real logouts still redirect correctly and are never retried.
+ *
+ * Wrapped in React's `cache()` because every authenticated route hits
+ * this at least twice in the same request — once in the `(app)`
+ * layout and once in the page itself, plus a third time in
+ * `generateMetadata` on pages that have one — all with the same
+ * `headers()` value. Without memoizing, that's 2-3 redundant session
+ * lookups (each a DB round trip through Better Auth) per page view.
+ * `cache()` scopes the memoization to a single request/render pass,
+ * so this can't leak session data across users or requests, and a
+ * throw is not cached — the next call in the same request retries
+ * from scratch rather than replaying a failure.
  */
-export async function getSessionWithRetry(
+export const getSessionWithRetry = cache(async function getSessionWithRetry(
   ...args: Parameters<typeof auth.api.getSession>
 ) {
   const maxAttempts = 2
@@ -100,4 +112,4 @@ export async function getSessionWithRetry(
   }
   // Surface the real failure — never masquerade a DB error as signed out.
   throw lastError
-}
+})
