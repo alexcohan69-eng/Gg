@@ -31,6 +31,11 @@ const pool = new Pool({
 })
 
 const statements = [
+  // Enables trigram-based indexes so ILIKE '%term%' partial-match
+  // search on user name/username and post content can use a GIN index
+  // instead of a full sequential scan as either table grows.
+  `create extension if not exists pg_trgm`,
+
   // Better Auth core tables
   `create table if not exists "user" (
     id text primary key,
@@ -73,6 +78,8 @@ const statements = [
     "updatedAt" timestamp not null default now()
   )`,
   `create unique index if not exists account_issuer_accountId_uidx on "account" (issuer, "accountId")`,
+  `create index if not exists user_name_trgm_idx on "user" using gin (name gin_trgm_ops)`,
+  `create index if not exists user_username_trgm_idx on "user" using gin (username gin_trgm_ops)`,
   `create table if not exists "verification" (
     id text primary key,
     identifier text not null,
@@ -101,6 +108,7 @@ const statements = [
   `create index if not exists posts_userId_idx on "posts" ("userId")`,
   `create index if not exists posts_replyToId_idx on "posts" ("replyToId")`,
   `create index if not exists posts_createdAt_idx on "posts" ("createdAt")`,
+  `create index if not exists posts_content_trgm_idx on "posts" using gin (content gin_trgm_ops)`,
 
   `create table if not exists "follows" (
     id text primary key,
@@ -149,6 +157,10 @@ const statements = [
   `create index if not exists notifications_userId_createdAt_idx on "notifications" ("userId", "createdAt" desc)`,
   `create index if not exists notifications_userId_isRead_idx on "notifications" ("userId", "isRead")`,
 
+  // "user1Id"/"user2Id" are always stored with the smaller id first
+  // (see sortPair in lib/messages.ts), so a single unique index on the
+  // pair both prevents duplicate conversations and backs the
+  // getOrCreateConversation lookup — no OR-based query needed there.
   `create table if not exists "conversations" (
     id text primary key,
     "user1Id" text not null,
@@ -156,6 +168,13 @@ const statements = [
     "lastMessageAt" timestamp not null default now(),
     "createdAt" timestamp not null default now()
   )`,
+  `create unique index if not exists conversations_user_pair_uidx on "conversations" ("user1Id", "user2Id")`,
+  // Composite indexes (rather than plain single-column ones) so the
+  // inbox query's "conversations for this user, newest first" can use
+  // the index for both the equality filter and the ORDER BY.
+  `create index if not exists conversations_user1Id_lastMessageAt_idx on "conversations" ("user1Id", "lastMessageAt" desc)`,
+  `create index if not exists conversations_user2Id_lastMessageAt_idx on "conversations" ("user2Id", "lastMessageAt" desc)`,
+
   `create table if not exists "messages" (
     id text primary key,
     "conversationId" text not null,
@@ -164,6 +183,10 @@ const statements = [
     "isRead" boolean not null default false,
     "createdAt" timestamp not null default now()
   )`,
+  `create index if not exists messages_conversationId_createdAt_idx on "messages" ("conversationId", "createdAt")`,
+  // Backs the inbox's per-conversation unread count (messages from the
+  // other participant that this viewer hasn't read yet).
+  `create index if not exists messages_conversationId_isRead_idx on "messages" ("conversationId", "isRead")`,
 ]
 
 const client = await pool.connect()

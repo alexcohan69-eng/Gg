@@ -2,6 +2,7 @@ import { redirect } from "next/navigation"
 import { headers } from "next/headers"
 import { auth } from "@/lib/auth"
 import { getUnreadNotificationCount } from "@/lib/notifications"
+import { getUnreadMessageCount } from "@/lib/messages"
 import { AppShell } from "@/components/app-shell"
 
 export default async function AppLayout({
@@ -15,9 +16,10 @@ export default async function AppLayout({
     redirect("/sign-in")
   }
 
-  const unreadNotificationsCount = await getUnreadNotificationCount(
-    session.user.id,
-  )
+  const [unreadNotificationsCount, unreadMessagesCount] = await Promise.all([
+    getUnreadNotificationCount(session.user.id),
+    getUnreadMessageCount(session.user.id),
+  ])
 
   return (
     <AppShell
@@ -28,6 +30,7 @@ export default async function AppLayout({
         username: (session.user as { username?: string | null }).username,
       }}
       unreadNotificationsCount={unreadNotificationsCount}
+      unreadMessagesCount={unreadMessagesCount}
     >
       {children}
     </AppShell>

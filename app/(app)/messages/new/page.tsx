@@ -3,20 +3,21 @@ import { headers } from "next/headers"
 import { redirect } from "next/navigation"
 import { auth } from "@/lib/auth"
 import { PageHeader } from "@/components/page-header"
-import { SearchExperience } from "@/components/search-experience"
+import { BackButton } from "@/components/back-button"
+import { NewConversationSearch } from "@/components/new-conversation-search"
 
 export const metadata: Metadata = {
-  title: "Explore",
+  title: "New message",
 }
 
-export default async function ExplorePage() {
+export default async function NewMessagePage() {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) redirect("/sign-in")
 
   return (
     <div className="flex flex-col">
-      <PageHeader title="Explore" description="Search people and posts" />
-      <SearchExperience currentUserId={session.user.id} />
+      <PageHeader title="New message" leading={<BackButton />} />
+      <NewConversationSearch />
     </div>
   )
 }
