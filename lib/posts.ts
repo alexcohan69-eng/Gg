@@ -1,5 +1,5 @@
 import { cache } from "react"
-import { and, asc, desc, eq, inArray, notInArray, sql } from "drizzle-orm"
+import { and, asc, count, desc, eq, gt, inArray, notInArray, sql } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { bookmarks, follows, likes, posts, reposts, user } from "@/lib/db/schema"
 import type { MediaAttachment } from "@/lib/media"
@@ -148,6 +148,49 @@ export async function getFollowingFeed(
     )
     .orderBy(desc(posts.createdAt))
     .limit(limit)
+}
+
+/**
+ * Count of top-level posts newer than `since` that would appear in the
+ * given home feed scope for this viewer. Backs the "Show N new posts"
+ * banner — the banner polls this cheap count instead of the full feed
+ * query, and only replaces the rendered list once the viewer opts in,
+ * so an in-progress read/scroll never gets yanked out from under them.
+ */
+export async function getNewPostsCount(
+  viewerId: string,
+  scope: "for-you" | "following",
+  since: Date,
+  excludeUserIds: Set<string> = new Set(),
+): Promise<number> {
+  const excludeCondition = excludeAuthorsCondition(excludeUserIds)
+
+  if (scope === "following") {
+    const followingRows = await db
+      .select({ followingId: follows.followingId })
+      .from(follows)
+      .where(eq(follows.followerId, viewerId))
+    const authorIds = [viewerId, ...followingRows.map((row) => row.followingId)]
+
+    const [row] = await db
+      .select({ value: count() })
+      .from(posts)
+      .where(
+        and(
+          eq(posts.isReply, false),
+          inArray(posts.userId, authorIds),
+          gt(posts.createdAt, since),
+          excludeCondition,
+        ),
+      )
+    return row?.value ?? 0
+  }
+
+  const [row] = await db
+    .select({ value: count() })
+    .from(posts)
+    .where(and(eq(posts.isReply, false), gt(posts.createdAt, since), excludeCondition))
+  return row?.value ?? 0
 }
 
 /** Top-level posts authored by a single user, newest first. */

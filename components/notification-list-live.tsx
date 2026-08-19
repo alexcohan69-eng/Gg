@@ -11,23 +11,11 @@ import {
   EmptyDescription,
 } from "@/components/ui/empty"
 import type { FeedNotification } from "@/lib/notifications"
-
-/** The wire shape of a notification once it's round-tripped through JSON. */
-type FeedNotificationDTO = Omit<FeedNotification, "createdAt"> & {
-  createdAt: string
-}
-
-async function fetcher(url: string): Promise<FeedNotification[]> {
-  const response = await fetch(url)
-  if (!response.ok) throw new Error("Failed to load notifications")
-  const data: { notifications: FeedNotificationDTO[] } = await response.json()
-  return data.notifications.map((notification) => ({
-    ...notification,
-    createdAt: new Date(notification.createdAt),
-  }))
-}
-
-const POLL_INTERVAL_MS = 15000
+import {
+  NOTIFICATIONS_KEY,
+  NOTIFICATIONS_POLL_INTERVAL_MS,
+  notificationsFetcher,
+} from "@/lib/swr/notifications"
 
 /**
  * Wraps the notifications list with polling so a like, reply, repost,
@@ -43,12 +31,16 @@ export function NotificationListLive({
 }: {
   initialNotifications: FeedNotification[]
 }) {
-  const { data } = useSWR<FeedNotification[]>("/api/notifications", fetcher, {
-    fallbackData: initialNotifications,
-    refreshInterval: POLL_INTERVAL_MS,
-    revalidateOnFocus: true,
-    dedupingInterval: 2000,
-  })
+  const { data } = useSWR<FeedNotification[]>(
+    NOTIFICATIONS_KEY,
+    notificationsFetcher,
+    {
+      fallbackData: initialNotifications,
+      refreshInterval: NOTIFICATIONS_POLL_INTERVAL_MS,
+      revalidateOnFocus: true,
+      dedupingInterval: 2000,
+    },
+  )
 
   const notifications = data ?? initialNotifications
 

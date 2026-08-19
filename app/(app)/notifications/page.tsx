@@ -21,7 +21,7 @@ export default async function NotificationsPage() {
   return (
     <div className="flex flex-col">
       <PageHeader title="Notifications">
-        {hasUnread ? <MarkAllReadButton /> : null}
+        <MarkAllReadButton initialHasUnread={hasUnread} />
       </PageHeader>
 
       <NotificationListLive initialNotifications={notifications} />
