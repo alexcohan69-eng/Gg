@@ -6,6 +6,7 @@ import { and, eq } from "drizzle-orm"
 import { getSessionWithRetry } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { notifications } from "@/lib/db/schema"
+import { logActionError } from "@/lib/log-action-error"
 
 async function getUserId() {
   const session = await getSessionWithRetry({ headers: await headers() })
@@ -38,7 +39,8 @@ export async function markNotificationRead(
 
     revalidatePath("/notifications")
     return { success: true }
-  } catch {
+  } catch (error) {
+    logActionError("markNotificationRead", error, { notificationId })
     return { success: false, error: "Couldn't update notification." }
   }
 }
@@ -56,7 +58,8 @@ export async function markAllNotificationsRead(): Promise<NotificationActionResu
 
     revalidatePath("/notifications")
     return { success: true }
-  } catch {
+  } catch (error) {
+    logActionError("markAllNotificationsRead", error)
     return { success: false, error: "Couldn't update notifications." }
   }
 }

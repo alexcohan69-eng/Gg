@@ -7,6 +7,7 @@ import { db } from "@/lib/db"
 import { bookmarks, likes, posts, reposts } from "@/lib/db/schema"
 import { createNotification, type NotificationType } from "@/lib/notifications"
 import { isBlockedEitherWay } from "@/lib/blocks"
+import { logActionError } from "@/lib/log-action-error"
 
 async function getUserId() {
   const session = await getSessionWithRetry({ headers: await headers() })
@@ -125,6 +126,7 @@ export async function likePost(postId: string): Promise<InteractionResult> {
     if (inserted) await notifyPostAction(postId, userId, "like")
     return { success: true }
   } catch (error) {
+    logActionError("likePost", error, { postId })
     return {
       success: false,
       error: error instanceof Error ? error.message : "Couldn't like post.",
@@ -137,7 +139,8 @@ export async function unlikePost(postId: string): Promise<InteractionResult> {
     const userId = await getUserId()
     await removeInteraction(likes, "likeCount", userId, postId)
     return { success: true }
-  } catch {
+  } catch (error) {
+    logActionError("unlikePost", error, { postId })
     return { success: false, error: "Couldn't unlike post." }
   }
 }
@@ -150,6 +153,7 @@ export async function repostPost(postId: string): Promise<InteractionResult> {
     if (inserted) await notifyPostAction(postId, userId, "repost")
     return { success: true }
   } catch (error) {
+    logActionError("repostPost", error, { postId })
     return {
       success: false,
       error: error instanceof Error ? error.message : "Couldn't repost.",
@@ -162,7 +166,8 @@ export async function undoRepost(postId: string): Promise<InteractionResult> {
     const userId = await getUserId()
     await removeInteraction(reposts, "repostCount", userId, postId)
     return { success: true }
-  } catch {
+  } catch (error) {
+    logActionError("undoRepost", error, { postId })
     return { success: false, error: "Couldn't undo repost." }
   }
 }
@@ -177,7 +182,8 @@ export async function bookmarkPost(
       .values({ id: crypto.randomUUID(), userId, postId })
       .onConflictDoNothing()
     return { success: true }
-  } catch {
+  } catch (error) {
+    logActionError("bookmarkPost", error, { postId })
     return { success: false, error: "Couldn't bookmark post." }
   }
 }
@@ -191,7 +197,8 @@ export async function removeBookmark(
       .delete(bookmarks)
       .where(and(eq(bookmarks.userId, userId), eq(bookmarks.postId, postId)))
     return { success: true }
-  } catch {
+  } catch (error) {
+    logActionError("removeBookmark", error, { postId })
     return { success: false, error: "Couldn't remove bookmark." }
   }
 }

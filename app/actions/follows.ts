@@ -8,6 +8,7 @@ import { db } from "@/lib/db"
 import { follows } from "@/lib/db/schema"
 import { createNotification } from "@/lib/notifications"
 import { isBlockedEitherWay } from "@/lib/blocks"
+import { logActionError } from "@/lib/log-action-error"
 
 async function getUserId() {
   const session = await getSessionWithRetry({ headers: await headers() })
@@ -73,7 +74,8 @@ export async function followUser(
 
     revalidateFollowPaths(profileIdentifier)
     return { success: true }
-  } catch {
+  } catch (error) {
+    logActionError("followUser", error, { targetUserId })
     return { success: false, error: "Couldn't follow user." }
   }
 }
@@ -93,7 +95,8 @@ export async function unfollowUser(
 
     revalidateFollowPaths(profileIdentifier)
     return { success: true }
-  } catch {
+  } catch (error) {
+    logActionError("unfollowUser", error, { targetUserId })
     return { success: false, error: "Couldn't unfollow user." }
   }
 }

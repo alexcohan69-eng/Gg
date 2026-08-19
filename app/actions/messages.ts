@@ -14,6 +14,7 @@ import {
 import { searchUsers } from "@/lib/search"
 import { isBlockedEitherWay } from "@/lib/blocks"
 import type { FollowListUser } from "@/lib/follows"
+import { logActionError } from "@/lib/log-action-error"
 
 const MAX_MESSAGE_LENGTH = 2000
 
@@ -46,6 +47,7 @@ export async function startConversation(
     revalidatePath("/messages")
     return { success: true, data: { conversationId } }
   } catch (error) {
+    logActionError("startConversation", error, { targetUserId })
     return {
       success: false,
       error: error instanceof Error ? error.message : "Couldn't start conversation.",
@@ -96,7 +98,8 @@ export async function sendMessage(
     revalidatePath(`/messages/${conversationId}`)
     revalidatePath("/messages")
     return { success: true, data: undefined }
-  } catch {
+  } catch (error) {
+    logActionError("sendMessage", error, { conversationId })
     return { success: false, error: "Couldn't send message." }
   }
 }
@@ -117,7 +120,8 @@ export async function markThreadRead(
     await markConversationRead(conversationId, viewerId)
     revalidatePath("/messages")
     return { success: true, data: undefined }
-  } catch {
+  } catch (error) {
+    logActionError("markThreadRead", error, { conversationId })
     return { success: false, error: "Couldn't update conversation." }
   }
 }
