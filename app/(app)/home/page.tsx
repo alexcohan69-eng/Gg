@@ -9,6 +9,7 @@ import { getBlockedUserIds } from "@/lib/blocks"
 import { PageHeader } from "@/components/page-header"
 import { PostComposer } from "@/components/post-composer"
 import { PostList } from "@/components/post-list"
+import { NewPostsBanner } from "@/components/new-posts-banner"
 import { cn } from "@/lib/utils"
 import { SparklesIcon, UsersIcon } from "lucide-react"
 
@@ -77,19 +78,34 @@ export default async function HomePage({
           emptyDescription="Posts from accounts you follow will show up here. Visit a profile and tap Follow to get started."
         />
       ) : (
-        <PostList
-          posts={posts}
-          currentUserId={session.user.id}
-          emptyIcon={SparklesIcon}
-          emptyTitle={
-            activeTab === "following" ? "No posts yet" : "Your feed is quiet"
-          }
-          emptyDescription={
-            activeTab === "following"
-              ? "The accounts you follow haven't posted anything yet."
-              : "Be the first to post — everything shared here shows up in the home timeline."
-          }
-        />
+        <>
+          {posts.length > 0 ? (
+            <NewPostsBanner
+              tab={activeTab}
+              // Postgres stores `createdAt` with microsecond precision,
+              // but the pg driver hands it back as a JS `Date` (millisecond
+              // precision), truncating any sub-millisecond remainder. A
+              // `gt(posts.createdAt, since)` count query using that
+              // truncated value as-is can therefore find the *same* row
+              // "newer than itself". Rounding the cursor forward by 1ms
+              // guarantees it's past that truncation error.
+              sinceIso={new Date(posts[0].createdAt.getTime() + 1).toISOString()}
+            />
+          ) : null}
+          <PostList
+            posts={posts}
+            currentUserId={session.user.id}
+            emptyIcon={SparklesIcon}
+            emptyTitle={
+              activeTab === "following" ? "No posts yet" : "Your feed is quiet"
+            }
+            emptyDescription={
+              activeTab === "following"
+                ? "The accounts you follow haven't posted anything yet."
+                : "Be the first to post — everything shared here shows up in the home timeline."
+            }
+          />
+        </>
       )}
     </div>
   )
