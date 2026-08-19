@@ -1,6 +1,6 @@
 import { drizzle } from "drizzle-orm/node-postgres"
 import { Pool } from "pg"
-import { Signer } from "@aws-sdk/rds-signer"
+import { DsqlSigner } from "@aws-sdk/dsql-signer"
 import { awsCredentialsProvider } from "@vercel/functions/oidc"
 import { attachDatabasePool } from "@vercel/functions"
 import { assertRequiredEnv } from "@/lib/env"
@@ -12,28 +12,43 @@ import * as schema from "./schema"
 assertRequiredEnv()
 
 /**
- * Connects to Aurora PostgreSQL via IAM auth over Vercel's OIDC
- * federation — there are no static AWS keys or a DATABASE_URL in this
- * setup. The signer's short-lived token is used as the Postgres
- * password and the `pg` pool refreshes it automatically on demand.
+ * Connects to Aurora DSQL via IAM auth over Vercel's OIDC federation —
+ * there are no static AWS keys or a DATABASE_URL in this setup. The
+ * signer's short-lived token is used as the Postgres password and the
+ * `pg` pool refreshes it automatically on demand.
+ *
+ * This MUST be `DsqlSigner` (`@aws-sdk/dsql-signer`), not `Signer`
+ * (`@aws-sdk/rds-signer`). DSQL and RDS sign IAM auth tokens for two
+ * different AWS services (`dsql` vs `rds-db`) — a token signed by the
+ * RDS signer is rejected by a DSQL endpoint with a generic "access
+ * denied" at the Postgres wire-protocol level, which otherwise looks
+ * identical to a real IAM permissions problem. PGHOST here resolves to
+ * a `*.dsql.<region>.on.aws` endpoint (Aurora DSQL), not an RDS
+ * cluster endpoint.
  */
-const signer = new Signer({
+const signer = new DsqlSigner({
   credentials: awsCredentialsProvider({
     roleArn: process.env.AWS_ROLE_ARN!,
     clientConfig: { region: process.env.AWS_REGION },
   }),
   region: process.env.AWS_REGION,
   hostname: process.env.PGHOST!,
-  username: process.env.PGUSER || "postgres",
-  port: 5432,
 })
+
+const pgUser = process.env.PGUSER || "admin"
+// The DSQL admin database role requires a token minted via
+// `getDbConnectAdminAuthToken()`; any other (scoped) role uses the
+// regular `getDbConnectAuthToken()`. Using the wrong one for a given
+// role is rejected the same way as a mismatched signer.
+const getAuthToken = () =>
+  pgUser === "admin" ? signer.getDbConnectAdminAuthToken() : signer.getDbConnectAuthToken()
 
 export const pool = new Pool({
   host: process.env.PGHOST,
   database: process.env.PGDATABASE || "postgres",
   port: 5432,
-  user: process.env.PGUSER || "postgres",
-  password: () => signer.getAuthToken(),
+  user: pgUser,
+  password: getAuthToken,
   ssl: { rejectUnauthorized: false },
   max: 20,
   // Without an explicit connection timeout, `pg` waits indefinitely

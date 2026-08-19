@@ -5,27 +5,35 @@
 // onConflictDoNothing() (follows, likes, bookmarks, reposts, and
 // Better Auth's account issuer+accountId pair). Safe to re-run: every
 // statement is IF NOT EXISTS / idempotent.
-import { Signer } from "@aws-sdk/rds-signer"
+import { DsqlSigner } from "@aws-sdk/dsql-signer"
 import { awsCredentialsProvider } from "@vercel/functions/oidc"
 import { Pool } from "pg"
 
-const signer = new Signer({
+// MUST be DsqlSigner (@aws-sdk/dsql-signer), not Signer
+// (@aws-sdk/rds-signer) — see lib/db/index.ts for why the RDS signer
+// is rejected by a DSQL endpoint (different signed service, "dsql"
+// vs "rds-db").
+const signer = new DsqlSigner({
   credentials: awsCredentialsProvider({
     roleArn: process.env.AWS_ROLE_ARN,
     clientConfig: { region: process.env.AWS_REGION },
   }),
   region: process.env.AWS_REGION,
   hostname: process.env.PGHOST,
-  username: process.env.PGUSER || "postgres",
-  port: 5432,
 })
+
+const pgUser = process.env.PGUSER || "admin"
+// Bootstrap DDL requires the admin auth token; a scoped role would
+// need getDbConnectAuthToken() instead (see lib/db/index.ts).
+const getAuthToken = () =>
+  pgUser === "admin" ? signer.getDbConnectAdminAuthToken() : signer.getDbConnectAuthToken()
 
 const pool = new Pool({
   host: process.env.PGHOST,
   database: process.env.PGDATABASE || "postgres",
   port: 5432,
-  user: process.env.PGUSER || "postgres",
-  password: () => signer.getAuthToken(),
+  user: pgUser,
+  password: getAuthToken,
   ssl: { rejectUnauthorized: false },
   max: 2,
 })
