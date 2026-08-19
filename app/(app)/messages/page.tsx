@@ -2,20 +2,12 @@ import type { Metadata } from "next"
 import Link from "next/link"
 import { headers } from "next/headers"
 import { redirect } from "next/navigation"
-import { MailIcon, SquarePenIcon } from "lucide-react"
+import { SquarePenIcon } from "lucide-react"
 import { auth } from "@/lib/auth"
 import { getConversations } from "@/lib/messages"
 import { PageHeader } from "@/components/page-header"
-import { ConversationListItem } from "@/components/conversation-list-item"
+import { ConversationList } from "@/components/conversation-list"
 import { Button } from "@/components/ui/button"
-import {
-  Empty,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-  EmptyDescription,
-  EmptyContent,
-} from "@/components/ui/empty"
 
 export const metadata: Metadata = {
   title: "Messages",
@@ -42,41 +34,10 @@ export default async function MessagesPage() {
         </Button>
       </PageHeader>
 
-      {conversations.length === 0 ? (
-        <div className="p-4">
-          <Empty>
-            <EmptyHeader>
-              <EmptyMedia variant="icon">
-                <MailIcon />
-              </EmptyMedia>
-              <EmptyTitle>No conversations yet</EmptyTitle>
-              <EmptyDescription>
-                Send a direct message to start a conversation with someone
-                you follow or find through search.
-              </EmptyDescription>
-            </EmptyHeader>
-            <EmptyContent>
-              <Button
-                className="rounded-full"
-                nativeButton={false}
-                render={<Link href="/messages/new" />}
-              >
-                New message
-              </Button>
-            </EmptyContent>
-          </Empty>
-        </div>
-      ) : (
-        <div className="flex flex-col">
-          {conversations.map((conversation) => (
-            <ConversationListItem
-              key={conversation.id}
-              conversation={conversation}
-              currentUserId={session.user.id}
-            />
-          ))}
-        </div>
-      )}
+      <ConversationList
+        initialConversations={conversations}
+        currentUserId={session.user.id}
+      />
     </div>
   )
 }

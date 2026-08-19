@@ -57,7 +57,19 @@ function ResultsSkeleton() {
   )
 }
 
-export function SearchExperience({ currentUserId }: { currentUserId: string }) {
+export function SearchExperience({
+  currentUserId,
+  discover,
+}: {
+  currentUserId: string
+  /**
+   * Rendered in place of the plain "find people and posts" prompt
+   * while the query is empty — e.g. trending posts / suggested users.
+   * Search behavior itself (debounce, results, no-results, loading)
+   * is unaffected by this prop.
+   */
+  discover?: React.ReactNode
+}) {
   const [query, setQuery] = useState("")
   const debouncedQuery = useDebouncedValue(query, DEBOUNCE_MS)
   const trimmedQuery = debouncedQuery.trim()
@@ -98,20 +110,22 @@ export function SearchExperience({ currentUserId }: { currentUserId: string }) {
       </div>
 
       {!hasQuery ? (
-        <div className="p-4">
-          <Empty>
-            <EmptyHeader>
-              <EmptyMedia variant="icon">
-                <SearchIcon />
-              </EmptyMedia>
-              <EmptyTitle>Find people and posts</EmptyTitle>
-              <EmptyDescription>
-                Search by name, username, or post content to discover
-                accounts and conversations on Pulse.
-              </EmptyDescription>
-            </EmptyHeader>
-          </Empty>
-        </div>
+        discover ?? (
+          <div className="p-4">
+            <Empty>
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <SearchIcon />
+                </EmptyMedia>
+                <EmptyTitle>Find people and posts</EmptyTitle>
+                <EmptyDescription>
+                  Search by name, username, or post content to discover
+                  accounts and conversations on Pulse.
+                </EmptyDescription>
+              </EmptyHeader>
+            </Empty>
+          </div>
+        )
       ) : isSearching ? (
         <ResultsSkeleton />
       ) : showNoResults ? (

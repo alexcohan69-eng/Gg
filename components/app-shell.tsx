@@ -3,6 +3,7 @@
 import { useState } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
+import useSWR from "swr"
 import { Menu, LogOut } from "lucide-react"
 import { Logo } from "@/components/logo"
 import { UserMenu } from "@/components/user-menu"
@@ -53,6 +54,16 @@ function isActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`)
 }
 
+type BadgeCounts = { unreadNotificationsCount: number; unreadMessagesCount: number }
+
+async function badgeCountsFetcher(url: string): Promise<BadgeCounts> {
+  const response = await fetch(url)
+  if (!response.ok) throw new Error("Failed to load badge counts")
+  return response.json()
+}
+
+const BADGE_POLL_INTERVAL_MS = 15000
+
 function badgeCountForHref(
   href: string,
   unreadNotificationsCount: number,
@@ -65,8 +76,8 @@ function badgeCountForHref(
 
 export function AppShell({
   user,
-  unreadNotificationsCount = 0,
-  unreadMessagesCount = 0,
+  unreadNotificationsCount: initialUnreadNotificationsCount = 0,
+  unreadMessagesCount: initialUnreadMessagesCount = 0,
   children,
 }: {
   user: ShellUser
@@ -77,6 +88,31 @@ export function AppShell({
   const pathname = usePathname()
   const router = useRouter()
   const [sheetOpen, setSheetOpen] = useState(false)
+
+  // Polls the notifications/messages badge counts so they stay live
+  // for events another user causes (a like, a new message) while the
+  // viewer sits on an unrelated page — not just after the viewer's own
+  // actions, which already refresh via revalidatePath. Seeded with the
+  // server-rendered counts from app/(app)/layout.tsx so there's no
+  // flash on first paint, and this persists across client-side
+  // navigation since AppShell itself doesn't remount between pages.
+  const { data: badgeCounts } = useSWR<BadgeCounts>(
+    "/api/badges",
+    badgeCountsFetcher,
+    {
+      fallbackData: {
+        unreadNotificationsCount: initialUnreadNotificationsCount,
+        unreadMessagesCount: initialUnreadMessagesCount,
+      },
+      refreshInterval: BADGE_POLL_INTERVAL_MS,
+      revalidateOnFocus: true,
+    },
+  )
+
+  const unreadNotificationsCount =
+    badgeCounts?.unreadNotificationsCount ?? initialUnreadNotificationsCount
+  const unreadMessagesCount =
+    badgeCounts?.unreadMessagesCount ?? initialUnreadMessagesCount
 
   async function handleSignOut() {
     await authClient.signOut()

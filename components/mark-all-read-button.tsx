@@ -2,6 +2,7 @@
 
 import { useTransition } from "react"
 import { useRouter } from "next/navigation"
+import { mutate } from "swr"
 import { toast } from "sonner"
 import { CheckCheckIcon } from "lucide-react"
 import { markAllNotificationsRead } from "@/app/actions/notifications"
@@ -18,6 +19,10 @@ export function MarkAllReadButton() {
         toast.error(result.error ?? "Couldn't mark notifications as read.")
         return
       }
+      // Nudge the nav badge down immediately instead of waiting for
+      // its next poll tick; router.refresh() still handles the list
+      // itself and this button's own visibility.
+      mutate("/api/badges")
       router.refresh()
     })
   }
