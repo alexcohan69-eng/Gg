@@ -2,7 +2,7 @@ import type { Metadata } from "next"
 import Link from "next/link"
 import { headers } from "next/headers"
 import { notFound, redirect } from "next/navigation"
-import { auth } from "@/lib/auth"
+import { getSessionWithRetry } from "@/lib/auth"
 import {
   getConversationForViewer,
   getMessages,
@@ -21,7 +21,7 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { conversationId } = await params
 
-  const session = await auth.api.getSession({ headers: await headers() })
+  const session = await getSessionWithRetry({ headers: await headers() })
   if (!session?.user) return { title: "Messages" }
 
   const conversation = await getConversationForViewer(
@@ -41,7 +41,7 @@ export default async function ConversationPage({
 }) {
   const { conversationId } = await params
 
-  const session = await auth.api.getSession({ headers: await headers() })
+  const session = await getSessionWithRetry({ headers: await headers() })
   if (!session?.user) redirect("/sign-in")
 
   // getConversationForViewer is the ownership check: it returns null

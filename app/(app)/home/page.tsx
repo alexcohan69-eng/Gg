@@ -2,7 +2,7 @@ import type { Metadata } from "next"
 import Link from "next/link"
 import { headers } from "next/headers"
 import { redirect } from "next/navigation"
-import { auth } from "@/lib/auth"
+import { getSessionWithRetry } from "@/lib/auth"
 import { getFeedPosts, getFollowingFeed } from "@/lib/posts"
 import { getFollowCounts } from "@/lib/follows"
 import { PageHeader } from "@/components/page-header"
@@ -28,7 +28,7 @@ export default async function HomePage({
   const { tab } = await searchParams
   const activeTab = tab === "following" ? "following" : "for-you"
 
-  const session = await auth.api.getSession({ headers: await headers() })
+  const session = await getSessionWithRetry({ headers: await headers() })
   if (!session?.user) redirect("/sign-in")
 
   const [posts, followCounts] = await Promise.all([
