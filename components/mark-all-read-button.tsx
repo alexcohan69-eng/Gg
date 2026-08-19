@@ -19,10 +19,12 @@ export function MarkAllReadButton() {
         toast.error(result.error ?? "Couldn't mark notifications as read.")
         return
       }
-      // Nudge the nav badge down immediately instead of waiting for
-      // its next poll tick; router.refresh() still handles the list
-      // itself and this button's own visibility.
+      // Nudge the nav badge and the live notifications list down
+      // immediately instead of waiting for their next poll tick;
+      // router.refresh() still handles this button's own visibility
+      // (it's computed server-side from `hasUnread`).
       mutate("/api/badges")
+      mutate("/api/notifications")
       router.refresh()
     })
   }
