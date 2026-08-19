@@ -1,7 +1,7 @@
 import type { Metadata } from "next"
 import { headers } from "next/headers"
 import { redirect } from "next/navigation"
-import { auth } from "@/lib/auth"
+import { getSessionWithRetry } from "@/lib/auth"
 import { getBookmarkedPosts } from "@/lib/posts"
 import { PageHeader } from "@/components/page-header"
 import { PostList } from "@/components/post-list"
@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 }
 
 export default async function BookmarksPage() {
-  const session = await auth.api.getSession({ headers: await headers() })
+  const session = await getSessionWithRetry({ headers: await headers() })
   if (!session?.user) redirect("/sign-in")
 
   const posts = await getBookmarkedPosts(session.user.id)

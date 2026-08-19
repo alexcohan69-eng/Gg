@@ -1,7 +1,7 @@
 import { headers } from "next/headers"
 import { type NextRequest, NextResponse } from "next/server"
 import { get } from "@vercel/blob"
-import { auth } from "@/lib/auth"
+import { getSessionWithRetry } from "@/lib/auth"
 
 /**
  * Streams a privately-stored post attachment (image, GIF, or video) to
@@ -20,7 +20,7 @@ import { auth } from "@/lib/auth"
  * range, we fall back to serving the full file.
  */
 export async function GET(request: NextRequest) {
-  const session = await auth.api.getSession({ headers: await headers() })
+  const session = await getSessionWithRetry({ headers: await headers() })
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }

@@ -1,7 +1,7 @@
 "use server"
 
 import { headers } from "next/headers"
-import { auth } from "@/lib/auth"
+import { getSessionWithRetry } from "@/lib/auth"
 import { searchPosts, searchUsers } from "@/lib/search"
 import type { FeedPost } from "@/lib/posts"
 import type { FollowListUser } from "@/lib/follows"
@@ -20,7 +20,7 @@ const MIN_QUERY_LENGTH = 1
  * indexed queries in parallel.
  */
 export async function search(query: string): Promise<SearchResults> {
-  const session = await auth.api.getSession({ headers: await headers() })
+  const session = await getSessionWithRetry({ headers: await headers() })
   if (!session?.user) throw new Error("Unauthorized")
 
   const trimmed = query.trim()

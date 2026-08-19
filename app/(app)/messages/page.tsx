@@ -3,7 +3,7 @@ import Link from "next/link"
 import { headers } from "next/headers"
 import { redirect } from "next/navigation"
 import { SquarePenIcon } from "lucide-react"
-import { auth } from "@/lib/auth"
+import { getSessionWithRetry } from "@/lib/auth"
 import { getConversations } from "@/lib/messages"
 import { PageHeader } from "@/components/page-header"
 import { ConversationList } from "@/components/conversation-list"
@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 }
 
 export default async function MessagesPage() {
-  const session = await auth.api.getSession({ headers: await headers() })
+  const session = await getSessionWithRetry({ headers: await headers() })
   if (!session?.user) redirect("/sign-in")
 
   const conversations = await getConversations(session.user.id)

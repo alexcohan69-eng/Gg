@@ -2,7 +2,7 @@ import type { Metadata } from "next"
 import { headers } from "next/headers"
 import { redirect } from "next/navigation"
 import { BellIcon } from "lucide-react"
-import { auth } from "@/lib/auth"
+import { getSessionWithRetry } from "@/lib/auth"
 import { getNotifications } from "@/lib/notifications"
 import { PageHeader } from "@/components/page-header"
 import { NotificationItem } from "@/components/notification-item"
@@ -20,7 +20,7 @@ export const metadata: Metadata = {
 }
 
 export default async function NotificationsPage() {
-  const session = await auth.api.getSession({ headers: await headers() })
+  const session = await getSessionWithRetry({ headers: await headers() })
   if (!session?.user) redirect("/sign-in")
 
   const notifications = await getNotifications(session.user.id)

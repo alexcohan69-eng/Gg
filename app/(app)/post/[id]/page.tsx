@@ -1,7 +1,7 @@
 import type { Metadata } from "next"
 import { headers } from "next/headers"
 import { notFound, redirect } from "next/navigation"
-import { auth } from "@/lib/auth"
+import { getSessionWithRetry } from "@/lib/auth"
 import { getPostById, getPostReplies } from "@/lib/posts"
 import { PageHeader } from "@/components/page-header"
 import { BackButton } from "@/components/back-button"
@@ -17,7 +17,7 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { id } = await params
 
-  const session = await auth.api.getSession({ headers: await headers() })
+  const session = await getSessionWithRetry({ headers: await headers() })
   if (!session?.user) {
     return { title: "Post" }
   }
@@ -43,7 +43,7 @@ export default async function PostDetailPage({
 }) {
   const { id } = await params
 
-  const session = await auth.api.getSession({ headers: await headers() })
+  const session = await getSessionWithRetry({ headers: await headers() })
   if (!session?.user) redirect("/sign-in")
 
   const post = await getPostById(id, session.user.id)

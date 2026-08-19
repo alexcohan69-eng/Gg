@@ -1,6 +1,6 @@
 import { headers } from "next/headers"
 import { NextResponse } from "next/server"
-import { auth } from "@/lib/auth"
+import { getSessionWithRetry } from "@/lib/auth"
 import { getUnreadNotificationCount } from "@/lib/notifications"
 import { getUnreadMessageCount } from "@/lib/messages"
 
@@ -12,7 +12,7 @@ import { getUnreadMessageCount } from "@/lib/messages"
  * on an unrelated page.
  */
 export async function GET() {
-  const session = await auth.api.getSession({ headers: await headers() })
+  const session = await getSessionWithRetry({ headers: await headers() })
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }

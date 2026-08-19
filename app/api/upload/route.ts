@@ -1,7 +1,7 @@
 import { put } from "@vercel/blob"
 import { headers } from "next/headers"
 import { NextResponse, type NextRequest } from "next/server"
-import { auth } from "@/lib/auth"
+import { getSessionWithRetry } from "@/lib/auth"
 import { getMediaTypeForMime, validateMediaFile } from "@/lib/media"
 
 /**
@@ -13,7 +13,7 @@ import { getMediaTypeForMime, validateMediaFile } from "@/lib/media"
  * composer's own check, which is only a UX shortcut.
  */
 export async function POST(request: NextRequest) {
-  const session = await auth.api.getSession({ headers: await headers() })
+  const session = await getSessionWithRetry({ headers: await headers() })
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }

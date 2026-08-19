@@ -1,7 +1,7 @@
 import type { Metadata } from "next"
 import { headers } from "next/headers"
 import { notFound, redirect } from "next/navigation"
-import { auth } from "@/lib/auth"
+import { getSessionWithRetry } from "@/lib/auth"
 import { getUserPosts } from "@/lib/posts"
 import { getFollowCounts, getProfileByIdentifier, isFollowing } from "@/lib/follows"
 import { profileHref } from "@/lib/utils"
@@ -31,7 +31,7 @@ export default async function PublicProfilePage({
 }) {
   const { username } = await params
 
-  const session = await auth.api.getSession({ headers: await headers() })
+  const session = await getSessionWithRetry({ headers: await headers() })
   if (!session?.user) redirect("/sign-in")
 
   const profile = await getProfileByIdentifier(username)

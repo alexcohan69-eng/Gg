@@ -1,7 +1,7 @@
 import type { Metadata } from "next"
 import { headers } from "next/headers"
 import { notFound, redirect } from "next/navigation"
-import { auth } from "@/lib/auth"
+import { getSessionWithRetry } from "@/lib/auth"
 import { getFollowing, getProfileByIdentifier } from "@/lib/follows"
 import { profileHref } from "@/lib/utils"
 import { PageHeader } from "@/components/page-header"
@@ -27,7 +27,7 @@ export default async function FollowingPage({
 }) {
   const { username } = await params
 
-  const session = await auth.api.getSession({ headers: await headers() })
+  const session = await getSessionWithRetry({ headers: await headers() })
   if (!session?.user) redirect("/sign-in")
 
   const profile = await getProfileByIdentifier(username)

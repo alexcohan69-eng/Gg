@@ -2,7 +2,7 @@ import type { Metadata } from "next"
 import { Suspense } from "react"
 import { headers } from "next/headers"
 import { redirect } from "next/navigation"
-import { auth } from "@/lib/auth"
+import { getSessionWithRetry } from "@/lib/auth"
 import { PageHeader } from "@/components/page-header"
 import { SearchExperience } from "@/components/search-experience"
 import { ExploreDiscover, ExploreDiscoverSkeleton } from "@/components/explore-discover"
@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 }
 
 export default async function ExplorePage() {
-  const session = await auth.api.getSession({ headers: await headers() })
+  const session = await getSessionWithRetry({ headers: await headers() })
   if (!session?.user) redirect("/sign-in")
 
   return (

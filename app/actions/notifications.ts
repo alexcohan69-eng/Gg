@@ -3,12 +3,12 @@
 import { headers } from "next/headers"
 import { revalidatePath } from "next/cache"
 import { and, eq } from "drizzle-orm"
-import { auth } from "@/lib/auth"
+import { getSessionWithRetry } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { notifications } from "@/lib/db/schema"
 
 async function getUserId() {
-  const session = await auth.api.getSession({ headers: await headers() })
+  const session = await getSessionWithRetry({ headers: await headers() })
   if (!session?.user) throw new Error("Unauthorized")
   return session.user.id
 }
