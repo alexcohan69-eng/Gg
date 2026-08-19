@@ -18,14 +18,44 @@ const spaceGrotesk = Space_Grotesk({
   display: "swap",
 })
 
+const siteUrl =
+  process.env.BETTER_AUTH_URL ??
+  (process.env.VERCEL_PROJECT_PRODUCTION_URL
+    ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+    : process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : process.env.V0_RUNTIME_URL ?? "http://localhost:3000")
+
+const title = "Pulse — Say it. Share it."
+const description =
+  "Pulse is a fast, focused social feed for real-time thoughts, threads, and conversations."
+
 export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl),
   title: {
-    default: "Pulse — Say it. Share it.",
+    default: title,
     template: "%s · Pulse",
   },
-  description:
-    "Pulse is a fast, focused social feed for real-time thoughts, threads, and conversations.",
+  description,
   generator: "v0.app",
+  openGraph: {
+    title,
+    description,
+    siteName: "Pulse",
+    type: "website",
+  },
+  twitter: {
+    card: "summary",
+    title,
+    description,
+  },
+  robots: {
+    // Authenticated feeds, threads, and DMs aren't useful search
+    // results and shouldn't be crawled or indexed. The public landing
+    // page (app/page.tsx) opts back in with its own metadata.
+    index: false,
+    follow: false,
+  },
 }
 
 export const viewport: Viewport = {

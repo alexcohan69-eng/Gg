@@ -1,3 +1,4 @@
+import type { Metadata } from "next"
 import Image from "next/image"
 import Link from "next/link"
 import { headers } from "next/headers"
@@ -6,6 +7,13 @@ import { House, MessageCircle, Bell, Users } from "lucide-react"
 import { auth } from "@/lib/auth"
 import { Button } from "@/components/ui/button"
 import { Logo } from "@/components/logo"
+
+// The one page on Pulse that's actually meant to be found via search —
+// everything past sign-in is a private feed. Opts back in to indexing
+// against the root layout's default `robots: { index: false }`.
+export const metadata: Metadata = {
+  robots: { index: true, follow: true },
+}
 
 const FEATURES = [
   {
