@@ -130,6 +130,13 @@ export async function getConversations(
     // DISTINCT ON picks one row per conversation — the newest, thanks
     // to the matching ORDER BY — so this is one indexed scan instead
     // of pulling every message just to find the latest in JS.
+    // `${conversationIds}` isn't bound as a single Postgres array
+    // value here — drizzle's sql template flattens a JS array
+    // parameter into a parenthesized, comma-joined placeholder list
+    // (the shape an `in` clause needs), so this must read `in`, not
+    // `= any(...)` (which expects one array-typed parameter and
+    // throws "malformed array literal" once it gets `in`'s list
+    // syntax instead).
     db.execute<{
       conversationId: string
       content: string
@@ -138,7 +145,7 @@ export async function getConversations(
     }>(
       sql`select distinct on ("conversationId") "conversationId", content, "senderId", "createdAt"
           from "messages"
-          where "conversationId" = any(${conversationIds})
+          where "conversationId" in ${conversationIds}
           order by "conversationId", "createdAt" desc`,
     ),
     db

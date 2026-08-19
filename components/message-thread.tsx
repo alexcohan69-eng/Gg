@@ -26,8 +26,27 @@ export function MessageThread({
     bottomRef.current?.scrollIntoView({ block: "end" })
   }, [messages.length])
 
+  if (messages.length === 0) {
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
+        <Avatar className="size-14">
+          <AvatarImage src={otherUser.image ?? undefined} alt={otherUser.name} />
+          <AvatarFallback className="text-lg">
+            {getInitials(otherUser.name)}
+          </AvatarFallback>
+        </Avatar>
+        <div className="space-y-1">
+          <p className="font-semibold text-foreground">{otherUser.name}</p>
+          <p className="text-sm text-muted-foreground">
+            This is the start of your conversation. Say hello!
+          </p>
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <div className="flex flex-1 flex-col gap-3 overflow-y-auto p-4">
+    <div className="flex flex-1 flex-col gap-3 p-4">
       {messages.map((message) => {
         const isOwn = message.senderId === currentUserId
 
