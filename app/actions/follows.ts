@@ -7,6 +7,7 @@ import { getSessionWithRetry } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { follows } from "@/lib/db/schema"
 import { createNotification } from "@/lib/notifications"
+import { isBlockedEitherWay } from "@/lib/blocks"
 
 async function getUserId() {
   const session = await getSessionWithRetry({ headers: await headers() })
@@ -44,6 +45,10 @@ export async function followUser(
 
     if (userId === targetUserId) {
       return { success: false, error: "You can't follow yourself." }
+    }
+
+    if (await isBlockedEitherWay(userId, targetUserId)) {
+      return { success: false, error: "You can't follow this account." }
     }
 
     const inserted = await db

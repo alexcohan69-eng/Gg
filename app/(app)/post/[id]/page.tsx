@@ -3,6 +3,7 @@ import { headers } from "next/headers"
 import { notFound, redirect } from "next/navigation"
 import { getSessionWithRetry } from "@/lib/auth"
 import { getPostById, getPostReplies } from "@/lib/posts"
+import { getBlockedUserIds } from "@/lib/blocks"
 import { PageHeader } from "@/components/page-header"
 import { BackButton } from "@/components/back-button"
 import { PostCard } from "@/components/post-card"
@@ -49,7 +50,8 @@ export default async function PostDetailPage({
   const post = await getPostById(id, session.user.id)
   if (!post) notFound()
 
-  const replies = await getPostReplies(id, session.user.id)
+  const blockedUserIds = await getBlockedUserIds(session.user.id)
+  const replies = await getPostReplies(id, session.user.id, blockedUserIds)
 
   return (
     <div className="flex flex-col">

@@ -4,6 +4,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { FollowButton } from "@/components/follow-button"
 import { MessageButton } from "@/components/message-button"
+import { BlockButton } from "@/components/block-button"
 import { getInitials } from "@/lib/utils"
 
 /**
@@ -27,6 +28,8 @@ export function ProfileHeader({
   isSelf,
   targetUserId,
   isFollowing,
+  viewerBlockedTarget,
+  targetBlockedViewer,
 }: {
   name: string
   username: string | null
@@ -45,6 +48,10 @@ export function ProfileHeader({
   targetUserId?: string
   /** Required when `isSelf` is false, to drive the follow button. */
   isFollowing?: boolean
+  /** Required when `isSelf` is false. Whether the viewer has blocked this profile. */
+  viewerBlockedTarget?: boolean
+  /** Required when `isSelf` is false. Whether this profile has blocked the viewer. */
+  targetBlockedViewer?: boolean
 }) {
   return (
     <div className="flex flex-col">

@@ -3,7 +3,13 @@ import { Pool } from "pg"
 import { Signer } from "@aws-sdk/rds-signer"
 import { awsCredentialsProvider } from "@vercel/functions/oidc"
 import { attachDatabasePool } from "@vercel/functions"
+import { assertRequiredEnv } from "@/lib/env"
 import * as schema from "./schema"
+
+// Fail fast with a clear message if AWS_ROLE_ARN, AWS_REGION, PGHOST,
+// or BETTER_AUTH_SECRET are missing, instead of surfacing an opaque
+// connection error later on the first request that touches the DB.
+assertRequiredEnv()
 
 /**
  * Connects to Aurora PostgreSQL via IAM auth over Vercel's OIDC

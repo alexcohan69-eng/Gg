@@ -8,6 +8,7 @@ import { getSessionWithRetry } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { posts } from "@/lib/db/schema"
 import { createNotification } from "@/lib/notifications"
+import { isBlockedEitherWay } from "@/lib/blocks"
 import {
   MAX_MEDIA_PER_POST,
   validateMediaAttachments,
@@ -126,6 +127,10 @@ export async function createPost(
       return { success: false, error: "Original post no longer exists." }
     }
     parentAuthorId = parent.userId
+
+    if (await isBlockedEitherWay(userId, parentAuthorId)) {
+      return { success: false, error: "You can't reply to this post." }
+    }
   }
 
   const postId = crypto.randomUUID()

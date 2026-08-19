@@ -148,3 +148,25 @@ export const messages = pgTable("messages", {
   isRead: boolean("isRead").notNull().default(false),
   createdAt: timestamp("createdAt").notNull().defaultNow(),
 })
+
+export const blocks = pgTable("blocks", {
+  id: text("id").primaryKey(),
+  blockerId: text("blockerId").notNull(),
+  blockedId: text("blockedId").notNull(),
+  createdAt: timestamp("createdAt").notNull().defaultNow(),
+})
+
+/**
+ * Moderation reports for the report-post / report-user MVP. `reason`
+ * is a small closed set of strings (see lib/moderation.ts) rather than
+ * its own enum table — there's no admin/reviewer UI yet, so keeping
+ * this a plain text column avoids a schema migration once one exists.
+ */
+export const reports = pgTable("reports", {
+  id: text("id").primaryKey(),
+  reporterId: text("reporterId").notNull(),
+  targetType: text("targetType").notNull(), // "post" | "user"
+  targetId: text("targetId").notNull(),
+  reason: text("reason").notNull(),
+  createdAt: timestamp("createdAt").notNull().defaultNow(),
+})

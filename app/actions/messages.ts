@@ -12,6 +12,7 @@ import {
   markConversationRead,
 } from "@/lib/messages"
 import { searchUsers } from "@/lib/search"
+import { isBlockedEitherWay } from "@/lib/blocks"
 import type { FollowListUser } from "@/lib/follows"
 
 const MAX_MESSAGE_LENGTH = 2000
@@ -36,6 +37,11 @@ export async function startConversation(
 ): Promise<MessageActionResult<{ conversationId: string }>> {
   try {
     const viewerId = await getUserId()
+
+    if (await isBlockedEitherWay(viewerId, targetUserId)) {
+      return { success: false, error: "You can't message this account." }
+    }
+
     const conversationId = await getOrCreateConversation(viewerId, targetUserId)
     revalidatePath("/messages")
     return { success: true, data: { conversationId } }
@@ -67,6 +73,13 @@ export async function sendMessage(
 
     const conversation = await getConversationForViewer(conversationId, viewerId)
     if (!conversation) return { success: false, error: "Conversation not found." }
+
+    // Re-checked here (not just in startConversation) because a block
+    // can happen after a conversation already exists — the thread
+    // shouldn't become a way to keep messaging around it.
+    if (await isBlockedEitherWay(viewerId, conversation.otherUser.id)) {
+      return { success: false, error: "You can't message this account." }
+    }
 
     await db.insert(messages).values({
       id: crypto.randomUUID(),

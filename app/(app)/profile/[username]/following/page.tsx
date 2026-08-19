@@ -3,6 +3,7 @@ import { headers } from "next/headers"
 import { notFound, redirect } from "next/navigation"
 import { getSessionWithRetry } from "@/lib/auth"
 import { getFollowing, getProfileByIdentifier } from "@/lib/follows"
+import { getBlockedUserIds } from "@/lib/blocks"
 import { profileHref } from "@/lib/utils"
 import { PageHeader } from "@/components/page-header"
 import { BackButton } from "@/components/back-button"
@@ -37,7 +38,8 @@ export default async function FollowingPage({
     redirect(`${profileHref(profile)}/following`)
   }
 
-  const following = await getFollowing(profile.id, session.user.id)
+  const blockedUserIds = await getBlockedUserIds(session.user.id)
+  const following = await getFollowing(profile.id, session.user.id, blockedUserIds)
   const isSelf = profile.id === session.user.id
 
   return (

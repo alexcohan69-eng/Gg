@@ -1,6 +1,10 @@
-import { and, desc, eq, sql } from "drizzle-orm"
+import { and, desc, eq, notInArray, sql } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { follows, user } from "@/lib/db/schema"
+
+function excludeUsersCondition(excludeUserIds: Set<string>) {
+  return excludeUserIds.size > 0 ? notInArray(user.id, [...excludeUserIds]) : undefined
+}
 
 /**
  * Public profile fields shared by the self profile page, public profile
@@ -111,13 +115,14 @@ export type FollowListUser = ProfileUser & {
 export async function getFollowers(
   userId: string,
   viewerId: string,
+  excludeUserIds: Set<string> = new Set(),
 ): Promise<FollowListUser[]> {
   const [rows, viewerFollowing] = await Promise.all([
     db
       .select(profileSelection)
       .from(follows)
       .innerJoin(user, eq(follows.followerId, user.id))
-      .where(eq(follows.followingId, userId))
+      .where(and(eq(follows.followingId, userId), excludeUsersCondition(excludeUserIds)))
       .orderBy(desc(follows.createdAt)),
     getViewerFollowingSet(viewerId),
   ])
@@ -133,13 +138,14 @@ export async function getFollowers(
 export async function getFollowing(
   userId: string,
   viewerId: string,
+  excludeUserIds: Set<string> = new Set(),
 ): Promise<FollowListUser[]> {
   const [rows, viewerFollowing] = await Promise.all([
     db
       .select(profileSelection)
       .from(follows)
       .innerJoin(user, eq(follows.followingId, user.id))
-      .where(eq(follows.followerId, userId))
+      .where(and(eq(follows.followerId, userId), excludeUsersCondition(excludeUserIds)))
       .orderBy(desc(follows.createdAt)),
     getViewerFollowingSet(viewerId),
   ])
