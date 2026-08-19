@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useEffect, useState, useTransition } from "react"
 import Link from "next/link"
 import {
   HeartIcon,
@@ -44,6 +44,14 @@ export function NotificationItem({
 }) {
   const [isRead, setIsRead] = useState(notification.isRead)
   const [, startTransition] = useTransition()
+
+  // Resync when the server sends fresh data (e.g. after "mark all read"
+  // triggers a router.refresh()) — otherwise this already-mounted item
+  // keeps whatever isRead it had at mount, since useState only reads its
+  // initial value once and ignores later prop changes.
+  useEffect(() => {
+    setIsRead(notification.isRead)
+  }, [notification.isRead])
 
   const meta = NOTIFICATION_META[notification.type]
   const Icon = meta.icon
