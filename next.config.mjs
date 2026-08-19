@@ -25,6 +25,16 @@ const nextConfig = {
             key: "Permissions-Policy",
             value: "camera=(), microphone=(), geolocation=()",
           },
+          {
+            // Report-only for now: Next.js hydration relies on inline
+            // scripts, so an enforcing script-src would need a nonce
+            // first. This still surfaces violations in the console
+            // without risking breakage. All app data (posts, media,
+            // auth) is same-origin, so connect-src stays scoped to 'self'.
+            key: "Content-Security-Policy-Report-Only",
+            value:
+              "default-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'; font-src 'self' data:; base-uri 'self'; form-action 'self'; frame-ancestors 'self'",
+          },
         ],
       },
     ]

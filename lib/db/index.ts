@@ -30,6 +30,18 @@ export const pool = new Pool({
   password: () => signer.getAuthToken(),
   ssl: { rejectUnauthorized: false },
   max: 20,
+  // Without an explicit connection timeout, `pg` waits indefinitely
+  // for a new connection to establish — a network blip or an
+  // unreachable Aurora endpoint would otherwise hang the request
+  // instead of failing fast.
+  connectionTimeoutMillis: 10_000,
+  // Recycles idle pooled connections so a stuck/half-open socket
+  // doesn't sit in the pool indefinitely between requests.
+  idleTimeoutMillis: 30_000,
+  // Caps how long the server will wait on a single statement. A
+  // runaway/blocked query (e.g. lock contention) fails and frees the
+  // connection instead of holding it — and the request — forever.
+  statement_timeout: 15_000,
 })
 attachDatabasePool(pool)
 
