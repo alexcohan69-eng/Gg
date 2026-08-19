@@ -12,6 +12,7 @@ import {
   BookmarkIcon,
   MoreHorizontalIcon,
   Trash2Icon,
+  FlagIcon,
 } from "lucide-react"
 import { deletePost } from "@/app/actions/posts"
 import {
@@ -30,6 +31,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { ReportDialog } from "@/components/report-dialog"
 import { cn, getInitials, formatRelativeTime, profileHref } from "@/lib/utils"
 import type { FeedPost } from "@/lib/posts"
 
@@ -72,6 +74,7 @@ export function PostCard({
 }) {
   const router = useRouter()
   const [isDeleting, startDeleting] = useTransition()
+  const [reportOpen, setReportOpen] = useState(false)
   const isOwner = post.authorId === currentUserId
   const detailHref = `/post/${post.id}`
 
@@ -192,21 +195,21 @@ export function PostCard({
             </ClickWrapper>
           </div>
 
-          {isOwner ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger
-                render={
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    className="-mt-1 shrink-0 rounded-full text-muted-foreground"
-                    aria-label="Post options"
-                  >
-                    <MoreHorizontalIcon />
-                  </Button>
-                }
-              />
-              <DropdownMenuContent align="end">
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  className="-mt-1 shrink-0 rounded-full text-muted-foreground"
+                  aria-label="Post options"
+                >
+                  <MoreHorizontalIcon />
+                </Button>
+              }
+            />
+            <DropdownMenuContent align="end">
+              {isOwner ? (
                 <DropdownMenuItem
                   variant="destructive"
                   onClick={handleDelete}
@@ -215,9 +218,14 @@ export function PostCard({
                   <Trash2Icon data-icon="inline-start" />
                   Delete
                 </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          ) : null}
+              ) : (
+                <DropdownMenuItem onClick={() => setReportOpen(true)}>
+                  <FlagIcon data-icon="inline-start" />
+                  Report post
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         <ClickWrapper href={detailHref} disabled={!linkToDetail}>
@@ -342,6 +350,14 @@ export function PostCard({
           </Button>
         </div>
       </div>
+
+      {!isOwner ? (
+        <ReportDialog
+          open={reportOpen}
+          onOpenChange={setReportOpen}
+          target={{ type: "post", id: post.id }}
+        />
+      ) : null}
     </article>
   )
 }

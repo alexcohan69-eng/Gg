@@ -1,5 +1,6 @@
 import { CompassIcon, FlameIcon, UserPlusIcon } from "lucide-react"
 import { getSuggestedUsers, getTrendingPosts } from "@/lib/explore"
+import { getBlockedUserIds } from "@/lib/blocks"
 import { PostCard } from "@/components/post-card"
 import { UserListItem } from "@/components/user-list-item"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -36,9 +37,10 @@ function SectionLabel({
  * so the search input itself is interactive immediately.
  */
 export async function ExploreDiscover({ currentUserId }: { currentUserId: string }) {
+  const blockedUserIds = await getBlockedUserIds(currentUserId)
   const [trendingPosts, suggestedUsers] = await Promise.all([
-    getTrendingPosts(currentUserId),
-    getSuggestedUsers(currentUserId),
+    getTrendingPosts(currentUserId, blockedUserIds),
+    getSuggestedUsers(currentUserId, blockedUserIds),
   ])
 
   if (trendingPosts.length === 0 && suggestedUsers.length === 0) {

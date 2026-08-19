@@ -3,6 +3,7 @@
 import { headers } from "next/headers"
 import { getSessionWithRetry } from "@/lib/auth"
 import { searchPosts, searchUsers } from "@/lib/search"
+import { getBlockedUserIds } from "@/lib/blocks"
 import type { FeedPost } from "@/lib/posts"
 import type { FollowListUser } from "@/lib/follows"
 
@@ -28,9 +29,11 @@ export async function search(query: string): Promise<SearchResults> {
     return { users: [], posts: [] }
   }
 
+  const blockedUserIds = await getBlockedUserIds(session.user.id)
+
   const [users, posts] = await Promise.all([
-    searchUsers(trimmed, session.user.id),
-    searchPosts(trimmed, session.user.id),
+    searchUsers(trimmed, session.user.id, blockedUserIds),
+    searchPosts(trimmed, session.user.id, blockedUserIds),
   ])
 
   return { users, posts }
