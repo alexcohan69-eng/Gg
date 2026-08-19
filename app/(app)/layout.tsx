@@ -3,6 +3,8 @@ import { headers } from "next/headers"
 import { getSessionWithRetry } from "@/lib/auth"
 import { getUnreadNotificationCount } from "@/lib/notifications"
 import { getUnreadMessageCount } from "@/lib/messages"
+import { isAdminEmail } from "@/lib/admin"
+import { getOpenReportCount } from "@/lib/reports"
 import { AppShell } from "@/components/app-shell"
 
 export default async function AppLayout({
@@ -16,10 +18,16 @@ export default async function AppLayout({
     redirect("/sign-in")
   }
 
-  const [unreadNotificationsCount, unreadMessagesCount] = await Promise.all([
-    getUnreadNotificationCount(session.user.id),
-    getUnreadMessageCount(session.user.id),
-  ])
+  const isAdmin = isAdminEmail(session.user.email)
+
+  const [unreadNotificationsCount, unreadMessagesCount, openReportCount] =
+    await Promise.all([
+      getUnreadNotificationCount(session.user.id),
+      getUnreadMessageCount(session.user.id),
+      // Skip the extra query entirely for the vast majority of users
+      // who aren't admins and will never see this count.
+      isAdmin ? getOpenReportCount() : Promise.resolve(0),
+    ])
 
   return (
     <AppShell
@@ -31,6 +39,8 @@ export default async function AppLayout({
       }}
       unreadNotificationsCount={unreadNotificationsCount}
       unreadMessagesCount={unreadMessagesCount}
+      isAdmin={isAdmin}
+      openReportCount={openReportCount}
     >
       {children}
     </AppShell>

@@ -38,13 +38,19 @@ export function ProfileStickyHeader({
   const headerRef = useRef<HTMLElement>(null)
 
   useEffect(() => {
-    const sentinel = document.getElementById("profile-identity-sentinel")
-    const header = headerRef.current
-    if (!sentinel || !header) return
+    const sentinelEl = document.getElementById("profile-identity-sentinel")
+    const headerEl = headerRef.current
+    if (!sentinelEl || !headerEl) return
 
     let observer: IntersectionObserver | undefined
 
+    // TS resets narrowing across a closure boundary, even for `const`
+    // bindings, so the non-null check above doesn't carry into this
+    // nested function. The `!` assertions are safe: sentinelEl/headerEl
+    // are never reassigned after the guard, on this or any later call.
     function observeWithCurrentOffset() {
+      const sentinel = sentinelEl!
+      const header = headerEl!
       observer?.disconnect()
       const stickyTop = Number.parseFloat(getComputedStyle(header).top) || 0
       observer = new IntersectionObserver(

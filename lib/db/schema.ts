@@ -159,8 +159,10 @@ export const blocks = pgTable("blocks", {
 /**
  * Moderation reports for the report-post / report-user MVP. `reason`
  * is a small closed set of strings (see lib/moderation.ts) rather than
- * its own enum table — there's no admin/reviewer UI yet, so keeping
- * this a plain text column avoids a schema migration once one exists.
+ * its own enum table. `status` + `reviewedBy`/`reviewedAt` back the
+ * admin review surface (lib/reports.ts, app/(app)/admin) — reports
+ * start "open" and move to "resolved" or "dismissed" once a moderator
+ * acts on them.
  */
 export const reports = pgTable("reports", {
   id: text("id").primaryKey(),
@@ -168,5 +170,8 @@ export const reports = pgTable("reports", {
   targetType: text("targetType").notNull(), // "post" | "user"
   targetId: text("targetId").notNull(),
   reason: text("reason").notNull(),
+  status: text("status").notNull().default("open"), // "open" | "resolved" | "dismissed"
+  reviewedBy: text("reviewedBy"),
+  reviewedAt: timestamp("reviewedAt"),
   createdAt: timestamp("createdAt").notNull().defaultNow(),
 })

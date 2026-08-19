@@ -4,7 +4,7 @@ import { useState } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import useSWR from "swr"
-import { Menu, LogOut } from "lucide-react"
+import { Menu, LogOut, ShieldIcon } from "lucide-react"
 import { Logo } from "@/components/logo"
 import { UserMenu } from "@/components/user-menu"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -78,11 +78,16 @@ export function AppShell({
   user,
   unreadNotificationsCount: initialUnreadNotificationsCount = 0,
   unreadMessagesCount: initialUnreadMessagesCount = 0,
+  isAdmin = false,
+  openReportCount = 0,
   children,
 }: {
   user: ShellUser
   unreadNotificationsCount?: number
   unreadMessagesCount?: number
+  /** Whether the signed-in user is an admin (see lib/admin.ts). Controls visibility of the moderation link only — never used for actual access control. */
+  isAdmin?: boolean
+  openReportCount?: number
   children: React.ReactNode
 }) {
   const pathname = usePathname()
@@ -156,6 +161,22 @@ export function AppShell({
                 </Link>
               )
             })}
+            {isAdmin ? (
+              <Link
+                href="/admin"
+                aria-current={isActive(pathname, "/admin") ? "page" : undefined}
+                className={cn(
+                  "flex items-center justify-center gap-4 rounded-full px-3 py-3 text-base font-medium text-foreground transition-colors hover:bg-accent lg:justify-start",
+                  isActive(pathname, "/admin") && "bg-accent text-accent-foreground font-semibold",
+                )}
+              >
+                <span className="relative shrink-0">
+                  <ShieldIcon className="size-6" aria-hidden="true" />
+                  <NavBadge count={openReportCount} />
+                </span>
+                <span className="hidden lg:inline">Moderation</span>
+              </Link>
+            ) : null}
           </nav>
         </div>
         <UserMenu user={user} />
@@ -211,6 +232,24 @@ export function AppShell({
                       </Link>
                     )
                   })}
+                  {isAdmin ? (
+                    <Link
+                      href="/admin"
+                      onClick={() => setSheetOpen(false)}
+                      aria-current={isActive(pathname, "/admin") ? "page" : undefined}
+                      className={cn(
+                        "flex items-center gap-4 rounded-full px-3 py-3 text-base font-medium text-foreground transition-colors hover:bg-accent",
+                        isActive(pathname, "/admin") &&
+                          "bg-accent text-accent-foreground font-semibold",
+                      )}
+                    >
+                      <span className="relative shrink-0">
+                        <ShieldIcon className="size-6" aria-hidden="true" />
+                        <NavBadge count={openReportCount} />
+                      </span>
+                      Moderation
+                    </Link>
+                  ) : null}
                 </nav>
                 <Button
                   variant="ghost"
