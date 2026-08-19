@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation"
 import { getSessionWithRetry } from "@/lib/auth"
 import { getUserPosts } from "@/lib/posts"
 import { getFollowCounts, getProfileByIdentifier, isFollowing } from "@/lib/follows"
+import { getBlockState } from "@/lib/blocks"
 import { profileHref } from "@/lib/utils"
 import { PageHeader } from "@/components/page-header"
 import { BackButton } from "@/components/back-button"
@@ -51,10 +52,13 @@ export default async function PublicProfilePage({
     year: "numeric",
   })
 
-  const [posts, followCounts, viewerIsFollowing] = await Promise.all([
+  const [posts, followCounts, viewerIsFollowing, blockState] = await Promise.all([
     getUserPosts(profile.id, session.user.id),
     getFollowCounts(profile.id),
     isSelf ? Promise.resolve(false) : isFollowing(session.user.id, profile.id),
+    isSelf
+      ? Promise.resolve({ viewerBlockedTarget: false, targetBlockedViewer: false })
+      : getBlockState(session.user.id, profile.id),
   ])
 
   return (
@@ -79,7 +83,10 @@ export default async function PublicProfilePage({
         profileIdentifier={username}
         isSelf={isSelf}
         targetUserId={profile.id}
+        targetUserName={profile.name}
         isFollowing={viewerIsFollowing}
+        viewerBlockedTarget={blockState.viewerBlockedTarget}
+        targetBlockedViewer={blockState.targetBlockedViewer}
       />
 
       <div className="border-t border-border">
