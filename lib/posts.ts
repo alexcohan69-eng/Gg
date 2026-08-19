@@ -1,3 +1,4 @@
+import { cache } from "react"
 import { and, asc, desc, eq, inArray, notInArray, sql } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { bookmarks, follows, likes, posts, reposts, user } from "@/lib/db/schema"
@@ -208,8 +209,12 @@ export async function getBookmarkedPosts(
  * by the post detail/thread page to render the post being viewed —
  * whether it's a top-level post or itself a reply, so nested threads
  * can be opened one level at a time.
+ *
+ * Wrapped in `cache()` because the post detail page's
+ * `generateMetadata` and the page body both fetch the same post once
+ * per request — memoizing collapses that back down to a single query.
  */
-export async function getPostById(
+export const getPostById = cache(async function getPostById(
   postId: string,
   viewerId: string,
 ): Promise<FeedPost | null> {
@@ -232,7 +237,7 @@ export async function getPostById(
     .limit(1)
 
   return rows[0] ?? null
-}
+})
 
 /**
  * Direct replies to a post, oldest first so the conversation reads

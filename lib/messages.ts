@@ -244,13 +244,23 @@ export async function getConversationForViewer(
   return { id: conversation.id, otherUser: otherUserRows[0] }
 }
 
-/** All messages in a conversation, oldest first. Caller must already
- * have verified the viewer is a participant (e.g. via
+// The thread page's `MessageThreadLive` polls this every 4s while a
+// conversation is open, so its cost needs to stay flat regardless of
+// how long the conversation has gotten — without a limit, a
+// long-running conversation re-scans and re-transfers its entire
+// history on every poll tick. This caps it to the most recent N
+// messages, which comfortably covers a normal scrollback and matches
+// the page-size convention used by the feed/search queries.
+const MESSAGES_PAGE_SIZE = 200
+
+/** The most recent messages in a conversation, oldest first. Caller
+ * must already have verified the viewer is a participant (e.g. via
  * `getConversationForViewer`). */
 export async function getMessages(
   conversationId: string,
+  limit = MESSAGES_PAGE_SIZE,
 ): Promise<ThreadMessage[]> {
-  return db
+  const rows = await db
     .select({
       id: messages.id,
       conversationId: messages.conversationId,
@@ -261,7 +271,10 @@ export async function getMessages(
     })
     .from(messages)
     .where(eq(messages.conversationId, conversationId))
-    .orderBy(messages.createdAt)
+    .orderBy(desc(messages.createdAt))
+    .limit(limit)
+
+  return rows.reverse()
 }
 
 /** Total unread messages across all of the viewer's conversations, for the nav badge. */

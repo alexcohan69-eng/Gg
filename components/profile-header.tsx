@@ -27,6 +27,7 @@ export function ProfileHeader({
   profileIdentifier,
   isSelf,
   targetUserId,
+  targetUserName,
   isFollowing,
   viewerBlockedTarget,
   targetBlockedViewer,
@@ -46,6 +47,8 @@ export function ProfileHeader({
   isSelf: boolean
   /** Required when `isSelf` is false, to drive the follow button. */
   targetUserId?: string
+  /** Required when `isSelf` is false, for block/report action labels and toasts. */
+  targetUserName?: string
   /** Required when `isSelf` is false, to drive the follow button. */
   isFollowing?: boolean
   /** Required when `isSelf` is false. Whether the viewer has blocked this profile. */
@@ -53,6 +56,10 @@ export function ProfileHeader({
   /** Required when `isSelf` is false. Whether this profile has blocked the viewer. */
   targetBlockedViewer?: boolean
 }) {
+  // Either direction of a block severs the normal follow/message
+  // affordances — the server actions already reject these, so hiding
+  // them here just keeps the UI honest instead of surfacing an error.
+  const interactionsBlocked = Boolean(viewerBlockedTarget || targetBlockedViewer)
   return (
     <div className="flex flex-col">
       <div
@@ -88,16 +95,32 @@ export function ProfileHeader({
             </Button>
           ) : (
             <div className="mt-10 flex items-center gap-2 sm:mt-12">
-              <MessageButton targetUserId={targetUserId!} />
-              <FollowButton
+              {!interactionsBlocked ? (
+                <>
+                  <MessageButton targetUserId={targetUserId!} />
+                  <FollowButton
+                    targetUserId={targetUserId!}
+                    initialIsFollowing={isFollowing!}
+                    profileIdentifier={profileIdentifier}
+                    size="default"
+                  />
+                </>
+              ) : null}
+              <BlockButton
                 targetUserId={targetUserId!}
-                initialIsFollowing={isFollowing!}
+                targetUserName={targetUserName ?? name}
                 profileIdentifier={profileIdentifier}
-                size="default"
+                initialIsBlocked={Boolean(viewerBlockedTarget)}
               />
             </div>
           )}
         </div>
+
+        {!isSelf && targetBlockedViewer ? (
+          <p className="mt-3 text-sm text-muted-foreground">
+            This account has restricted interactions with you.
+          </p>
+        ) : null}
 
         <div className="mt-4 space-y-1">
           <h2 className="font-heading text-xl font-semibold tracking-tight text-foreground">
