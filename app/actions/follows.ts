@@ -6,7 +6,6 @@ import { and, eq } from "drizzle-orm"
 import { auth } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { follows } from "@/lib/db/schema"
-import { createNotification } from "@/lib/notifications"
 
 async function getUserId() {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -46,7 +45,7 @@ export async function followUser(
       return { success: false, error: "You can't follow yourself." }
     }
 
-    const inserted = await db
+    await db
       .insert(follows)
       .values({
         id: crypto.randomUUID(),
@@ -54,18 +53,6 @@ export async function followUser(
         followingId: targetUserId,
       })
       .onConflictDoNothing()
-      .returning({ id: follows.id })
-
-    // Only notify on a genuinely new follow edge — re-following after
-    // an unfollow is a new event, but a duplicate request (already
-    // following) shouldn't spam a second notification.
-    if (inserted.length > 0) {
-      await createNotification({
-        userId: targetUserId,
-        actorId: userId,
-        type: "follow",
-      })
-    }
 
     revalidateFollowPaths(profileIdentifier)
     return { success: true }

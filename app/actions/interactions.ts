@@ -5,7 +5,6 @@ import { and, eq, sql } from "drizzle-orm"
 import { auth } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { bookmarks, likes, posts, reposts } from "@/lib/db/schema"
-import { createNotification, type NotificationType } from "@/lib/notifications"
 
 async function getUserId() {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -27,38 +26,23 @@ export type InteractionResult = {
 async function addInteraction(
   table: typeof likes | typeof reposts,
   countColumn: "likeCount" | "repostCount",
-  notificationType: NotificationType,
   userId: string,
   postId: string,
 ) {
-  const postAuthorId = await db.transaction(async (tx) => {
+  await db.transaction(async (tx) => {
     const inserted = await tx
       .insert(table)
       .values({ id: crypto.randomUUID(), userId, postId })
       .onConflictDoNothing()
       .returning({ id: table.id })
 
-    // Only a genuinely new row (not a duplicate like/repost request)
-    // bumps the count and is worth notifying the author about.
-    if (inserted.length === 0) return null
-
-    const [updated] = await tx
-      .update(posts)
-      .set({ [countColumn]: sql`${posts[countColumn]} + 1` })
-      .where(eq(posts.id, postId))
-      .returning({ authorId: posts.userId })
-
-    return updated?.authorId ?? null
+    if (inserted.length > 0) {
+      await tx
+        .update(posts)
+        .set({ [countColumn]: sql`${posts[countColumn]} + 1` })
+        .where(eq(posts.id, postId))
+    }
   })
-
-  if (postAuthorId) {
-    await createNotification({
-      userId: postAuthorId,
-      actorId: userId,
-      type: notificationType,
-      postId,
-    })
-  }
 }
 
 async function removeInteraction(
@@ -85,7 +69,7 @@ async function removeInteraction(
 export async function likePost(postId: string): Promise<InteractionResult> {
   try {
     const userId = await getUserId()
-    await addInteraction(likes, "likeCount", "like", userId, postId)
+    await addInteraction(likes, "likeCount", userId, postId)
     return { success: true }
   } catch {
     return { success: false, error: "Couldn't like post." }
@@ -105,7 +89,7 @@ export async function unlikePost(postId: string): Promise<InteractionResult> {
 export async function repostPost(postId: string): Promise<InteractionResult> {
   try {
     const userId = await getUserId()
-    await addInteraction(reposts, "repostCount", "repost", userId, postId)
+    await addInteraction(reposts, "repostCount", userId, postId)
     return { success: true }
   } catch {
     return { success: false, error: "Couldn't repost." }
