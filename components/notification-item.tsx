@@ -10,7 +10,6 @@ import {
   UserRoundPlusIcon,
 } from "lucide-react"
 import { markNotificationRead } from "@/app/actions/notifications"
-import { NOTIFICATIONS_KEY } from "@/components/notification-list"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { cn, formatRelativeTime, getInitials, profileHref } from "@/lib/utils"
@@ -72,12 +71,9 @@ export function NotificationItem({
         setIsRead(false)
         return
       }
-      // Nudge the nav badge and the notifications list cache down
-      // immediately instead of waiting for their next poll tick — the
-      // latter keeps "Mark all read" visibility (which reads the same
-      // cache) in sync without an extra round trip of its own.
+      // Nudge the nav badge down immediately instead of waiting for
+      // its next poll tick.
       mutate("/api/badges")
-      mutate(NOTIFICATIONS_KEY)
     })
   }
 
