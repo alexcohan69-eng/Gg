@@ -33,8 +33,12 @@ export const pool = new Pool({
   // Without an explicit connection timeout, `pg` waits indefinitely
   // for a new connection to establish — a network blip or an
   // unreachable Aurora endpoint would otherwise hang the request
-  // instead of failing fast.
-  connectionTimeoutMillis: 10_000,
+  // instead of failing fast. 30s (rather than a tighter value) gives
+  // enough headroom for the full cold-start chain on a fresh
+  // serverless invocation — OIDC token exchange, STS AssumeRole,
+  // RDS IAM token signing, then the actual TLS/Postgres handshake —
+  // which can otherwise get falsely flagged as a hung connection.
+  connectionTimeoutMillis: 30_000,
   // Recycles idle pooled connections so a stuck/half-open socket
   // doesn't sit in the pool indefinitely between requests.
   idleTimeoutMillis: 30_000,

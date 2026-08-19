@@ -4,7 +4,7 @@ import Link from "next/link"
 import { headers } from "next/headers"
 import { redirect } from "next/navigation"
 import { House, MessageCircle, Bell, Users } from "lucide-react"
-import { auth } from "@/lib/auth"
+import { getSessionSafe } from "@/lib/auth"
 import { Button } from "@/components/ui/button"
 import { Logo } from "@/components/logo"
 
@@ -43,7 +43,7 @@ const FEATURES = [
 ]
 
 export default async function LandingPage() {
-  const session = await auth.api.getSession({ headers: await headers() })
+  const session = await getSessionSafe({ headers: await headers() })
   if (session?.user) redirect("/home")
 
   return (
