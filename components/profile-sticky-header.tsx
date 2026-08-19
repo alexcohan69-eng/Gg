@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { cn } from "@/lib/utils"
 
 /**
@@ -12,6 +12,14 @@ import { cn } from "@/lib/utils"
  * `ProfileHeader`), so the same identity isn't shown twice on screen
  * at once. `PageHeader` itself is used by every other page and stays
  * untouched — they all want their title visible immediately.
+ *
+ * On mobile this header stacks below AppShell's own sticky top bar
+ * (via `top-14`, matching that bar's fixed height) rather than at
+ * `top-0`, otherwise both would land on the same sticky position and
+ * overlap once scrolled. That offset is read back from the DOM (this
+ * header's own resolved `top`) instead of duplicating the `56` number
+ * into the IntersectionObserver's rootMargin, so the two can't drift
+ * out of sync, and it stays correct if AppShell's bar height changes.
  *
  * The name/handle stay in the DOM at all times (only their opacity
  * animates), so screen readers still get an immediate page heading on
@@ -27,21 +35,40 @@ export function ProfileStickyHeader({
   leading?: React.ReactNode
 }) {
   const [revealed, setRevealed] = useState(false)
+  const headerRef = useRef<HTMLElement>(null)
 
   useEffect(() => {
     const sentinel = document.getElementById("profile-identity-sentinel")
-    if (!sentinel) return
+    const header = headerRef.current
+    if (!sentinel || !header) return
 
-    const observer = new IntersectionObserver(
-      ([entry]) => setRevealed(!entry.isIntersecting),
-      { rootMargin: "-64px 0px 0px 0px" },
-    )
-    observer.observe(sentinel)
-    return () => observer.disconnect()
+    let observer: IntersectionObserver | undefined
+
+    function observeWithCurrentOffset() {
+      observer?.disconnect()
+      const stickyTop = Number.parseFloat(getComputedStyle(header).top) || 0
+      observer = new IntersectionObserver(
+        ([entry]) => setRevealed(!entry.isIntersecting),
+        { rootMargin: `-${stickyTop}px 0px 0px 0px` },
+      )
+      observer.observe(sentinel)
+    }
+
+    observeWithCurrentOffset()
+    // Re-measure on resize since the sticky offset changes at the
+    // md breakpoint (AppShell's mobile bar disappears).
+    window.addEventListener("resize", observeWithCurrentOffset)
+    return () => {
+      window.removeEventListener("resize", observeWithCurrentOffset)
+      observer?.disconnect()
+    }
   }, [])
 
   return (
-    <header className="sticky top-0 z-30 flex items-center justify-between gap-4 border-b border-border bg-background/95 px-4 py-4 backdrop-blur-sm">
+    <header
+      ref={headerRef}
+      className="sticky top-14 z-30 flex items-center justify-between gap-4 border-b border-border bg-background/95 px-4 py-4 backdrop-blur-sm md:top-0"
+    >
       <div className="flex items-center gap-3">
         {leading}
         <div

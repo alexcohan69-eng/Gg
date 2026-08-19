@@ -163,8 +163,11 @@ export function AppShell({
 
       {/* Main content column */}
       <div className="flex min-h-svh flex-1 flex-col border-r border-border">
-        {/* Mobile top bar */}
-        <header className="sticky top-0 z-40 flex items-center justify-between border-b border-border bg-background/95 px-4 py-3 backdrop-blur-sm md:hidden">
+        {/* Mobile top bar. Fixed at h-14 (rather than letting padding
+            size it) so other sticky headers below it — e.g.
+            ProfileStickyHeader — can reserve the same offset and
+            stack underneath instead of overlapping it once scrolled. */}
+        <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-border bg-background/95 px-4 backdrop-blur-sm md:hidden">
           <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
             <SheetTrigger
               render={
