@@ -31,6 +31,11 @@ const pool = new Pool({
 })
 
 const statements = [
+  // Enables trigram-based indexes so ILIKE '%term%' partial-match
+  // search on user name/username and post content can use a GIN index
+  // instead of a full sequential scan as either table grows.
+  `create extension if not exists pg_trgm`,
+
   // Better Auth core tables
   `create table if not exists "user" (
     id text primary key,
@@ -73,6 +78,8 @@ const statements = [
     "updatedAt" timestamp not null default now()
   )`,
   `create unique index if not exists account_issuer_accountId_uidx on "account" (issuer, "accountId")`,
+  `create index if not exists user_name_trgm_idx on "user" using gin (name gin_trgm_ops)`,
+  `create index if not exists user_username_trgm_idx on "user" using gin (username gin_trgm_ops)`,
   `create table if not exists "verification" (
     id text primary key,
     identifier text not null,
@@ -101,6 +108,7 @@ const statements = [
   `create index if not exists posts_userId_idx on "posts" ("userId")`,
   `create index if not exists posts_replyToId_idx on "posts" ("replyToId")`,
   `create index if not exists posts_createdAt_idx on "posts" ("createdAt")`,
+  `create index if not exists posts_content_trgm_idx on "posts" using gin (content gin_trgm_ops)`,
 
   `create table if not exists "follows" (
     id text primary key,

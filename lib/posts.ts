@@ -30,7 +30,7 @@ export type FeedPost = {
 
 const FEED_PAGE_SIZE = 30
 
-const baseSelection = {
+export const feedBaseSelection = {
   id: posts.id,
   content: posts.content,
   media: posts.media,
@@ -51,7 +51,7 @@ const baseSelection = {
  * (userId, postId) index on each table guarantees at most one matching
  * row, so this never fans out the result set.
  */
-function withLikeAndRepostJoins(query: any, viewerId: string) {
+export function withLikeAndRepostJoins(query: any, viewerId: string) {
   return query
     .leftJoin(
       likes,
@@ -74,7 +74,7 @@ export async function getFeedPosts(
 ): Promise<FeedPost[]> {
   const query = db
     .select({
-      ...baseSelection,
+      ...feedBaseSelection,
       isLiked: sql<boolean>`${likes.id} is not null`,
       isBookmarked: sql<boolean>`${bookmarks.id} is not null`,
       isReposted: sql<boolean>`${reposts.id} is not null`,
@@ -112,7 +112,7 @@ export async function getFollowingFeed(
 
   const query = db
     .select({
-      ...baseSelection,
+      ...feedBaseSelection,
       isLiked: sql<boolean>`${likes.id} is not null`,
       isBookmarked: sql<boolean>`${bookmarks.id} is not null`,
       isReposted: sql<boolean>`${reposts.id} is not null`,
@@ -138,7 +138,7 @@ export async function getUserPosts(
 ): Promise<FeedPost[]> {
   const query = db
     .select({
-      ...baseSelection,
+      ...feedBaseSelection,
       isLiked: sql<boolean>`${likes.id} is not null`,
       isBookmarked: sql<boolean>`${bookmarks.id} is not null`,
       isReposted: sql<boolean>`${reposts.id} is not null`,
@@ -168,7 +168,7 @@ export async function getBookmarkedPosts(
 ): Promise<FeedPost[]> {
   const query = db
     .select({
-      ...baseSelection,
+      ...feedBaseSelection,
       isLiked: sql<boolean>`${likes.id} is not null`,
       isBookmarked: sql<boolean>`true`,
       isReposted: sql<boolean>`${reposts.id} is not null`,
@@ -195,7 +195,7 @@ export async function getPostById(
 ): Promise<FeedPost | null> {
   const query = db
     .select({
-      ...baseSelection,
+      ...feedBaseSelection,
       isLiked: sql<boolean>`${likes.id} is not null`,
       isBookmarked: sql<boolean>`${bookmarks.id} is not null`,
       isReposted: sql<boolean>`${reposts.id} is not null`,
@@ -227,7 +227,7 @@ export async function getPostReplies(
 ): Promise<FeedPost[]> {
   const query = db
     .select({
-      ...baseSelection,
+      ...feedBaseSelection,
       isLiked: sql<boolean>`${likes.id} is not null`,
       isBookmarked: sql<boolean>`${bookmarks.id} is not null`,
       isReposted: sql<boolean>`${reposts.id} is not null`,
