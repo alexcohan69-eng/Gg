@@ -4,6 +4,16 @@ import { bookmarks, follows, likes, posts, reposts, user } from "@/lib/db/schema
 import { feedBaseSelection, withLikeAndRepostJoins, type FeedPost } from "@/lib/posts"
 import type { FollowListUser } from "@/lib/follows"
 
+function excludeUsersCondition(excludeUserIds: Set<string>) {
+  return excludeUserIds.size > 0 ? notInArray(user.id, [...excludeUserIds]) : undefined
+}
+
+function excludeAuthorsCondition(excludeUserIds: Set<string>) {
+  return excludeUserIds.size > 0
+    ? notInArray(posts.userId, [...excludeUserIds])
+    : undefined
+}
+
 const TRENDING_LIMIT = 6
 const TRENDING_LOOKBACK_DAYS = 14
 // Below this many candidates in the recent window, the "trending" list
@@ -22,7 +32,12 @@ const SUGGESTED_USERS_LIMIT = 5
  */
 const trendingScore = sql<number>`(${posts.likeCount} + ${posts.repostCount} * 2 + ${posts.replyCount} * 1.5)`
 
-async function fetchTrendingPosts(viewerId: string, limit: number, cutoff: Date | null) {
+async function fetchTrendingPosts(
+  viewerId: string,
+  limit: number,
+  cutoff: Date | null,
+  excludeUserIds: Set<string>,
+) {
   const query = db
     .select({
       ...feedBaseSelection,
@@ -39,6 +54,8 @@ async function fetchTrendingPosts(viewerId: string, limit: number, cutoff: Date 
 
   const conditions = [eq(posts.isReply, false), sql`${trendingScore} > 0`]
   if (cutoff) conditions.push(gte(posts.createdAt, cutoff))
+  const excludeCondition = excludeAuthorsCondition(excludeUserIds)
+  if (excludeCondition) conditions.push(excludeCondition)
 
   return withLikeAndRepostJoins(query, viewerId)
     .where(and(...conditions))
@@ -57,16 +74,17 @@ async function fetchTrendingPosts(viewerId: string, limit: number, cutoff: Date 
  */
 export async function getTrendingPosts(
   viewerId: string,
+  excludeUserIds: Set<string> = new Set(),
   limit = TRENDING_LIMIT,
 ): Promise<FeedPost[]> {
   const cutoff = new Date(Date.now() - TRENDING_LOOKBACK_DAYS * 24 * 60 * 60 * 1000)
 
-  const recent = await fetchTrendingPosts(viewerId, limit, cutoff)
+  const recent = await fetchTrendingPosts(viewerId, limit, cutoff, excludeUserIds)
   if (recent.length >= Math.min(limit, TRENDING_MIN_RECENT_RESULTS)) {
     return recent
   }
 
-  return fetchTrendingPosts(viewerId, limit, null)
+  return fetchTrendingPosts(viewerId, limit, null, excludeUserIds)
 }
 
 /**
@@ -80,6 +98,7 @@ export async function getTrendingPosts(
  */
 export async function getSuggestedUsers(
   viewerId: string,
+  excludeUserIds: Set<string> = new Set(),
   limit = SUGGESTED_USERS_LIMIT,
 ): Promise<FollowListUser[]> {
   const followerCount = sql<number>`count(${follows.id})::int`
@@ -103,7 +122,13 @@ export async function getSuggestedUsers(
     })
     .from(user)
     .leftJoin(follows, eq(follows.followingId, user.id))
-    .where(and(ne(user.id, viewerId), notInArray(user.id, alreadyFollowing)))
+    .where(
+      and(
+        ne(user.id, viewerId),
+        notInArray(user.id, alreadyFollowing),
+        excludeUsersCondition(excludeUserIds),
+      ),
+    )
     .groupBy(user.id)
     .orderBy(desc(followerCount), desc(user.createdAt))
     .limit(limit)

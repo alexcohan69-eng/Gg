@@ -1,10 +1,20 @@
-import { and, asc, desc, eq, ilike, or, sql } from "drizzle-orm"
+import { and, asc, desc, eq, ilike, notInArray, or, sql } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { bookmarks, follows, likes, posts, reposts, user } from "@/lib/db/schema"
 import { feedBaseSelection, withLikeAndRepostJoins, type FeedPost } from "@/lib/posts"
 import type { FollowListUser } from "@/lib/follows"
 
 const SEARCH_LIMIT = 20
+
+function excludeUsersCondition(excludeUserIds: Set<string>) {
+  return excludeUserIds.size > 0 ? notInArray(user.id, [...excludeUserIds]) : undefined
+}
+
+function excludeAuthorsCondition(excludeUserIds: Set<string>) {
+  return excludeUserIds.size > 0
+    ? notInArray(posts.userId, [...excludeUserIds])
+    : undefined
+}
 
 /**
  * Escapes ILIKE's own wildcard characters so a literal "%" or "_" (or
@@ -26,6 +36,7 @@ function toSearchPattern(query: string) {
 export async function searchUsers(
   query: string,
   viewerId: string,
+  excludeUserIds: Set<string> = new Set(),
   limit = SEARCH_LIMIT,
 ): Promise<FollowListUser[]> {
   const pattern = toSearchPattern(query)
@@ -48,7 +59,12 @@ export async function searchUsers(
       follows,
       and(eq(follows.followerId, viewerId), eq(follows.followingId, user.id)),
     )
-    .where(or(ilike(user.name, pattern), ilike(user.username, pattern)))
+    .where(
+      and(
+        or(ilike(user.name, pattern), ilike(user.username, pattern)),
+        excludeUsersCondition(excludeUserIds),
+      ),
+    )
     .orderBy(asc(user.name))
     .limit(limit)
 
@@ -66,6 +82,7 @@ export async function searchUsers(
 export async function searchPosts(
   query: string,
   viewerId: string,
+  excludeUserIds: Set<string> = new Set(),
   limit = SEARCH_LIMIT,
 ): Promise<FeedPost[]> {
   const pattern = toSearchPattern(query)
@@ -85,7 +102,13 @@ export async function searchPosts(
     )
 
   return withLikeAndRepostJoins(searchQuery, viewerId)
-    .where(and(eq(posts.isReply, false), ilike(posts.content, pattern)))
+    .where(
+      and(
+        eq(posts.isReply, false),
+        ilike(posts.content, pattern),
+        excludeAuthorsCondition(excludeUserIds),
+      ),
+    )
     .orderBy(desc(posts.createdAt))
     .limit(limit)
 }

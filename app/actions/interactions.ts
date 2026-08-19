@@ -6,6 +6,7 @@ import { getSessionWithRetry } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { bookmarks, likes, posts, reposts } from "@/lib/db/schema"
 import { createNotification, type NotificationType } from "@/lib/notifications"
+import { isBlockedEitherWay } from "@/lib/blocks"
 
 async function getUserId() {
   const session = await getSessionWithRetry({ headers: await headers() })
@@ -97,14 +98,37 @@ async function removeInteraction(
   })
 }
 
+/**
+ * Rejects the interaction when the actor and the post's author have
+ * blocked each other in either direction. Posts from blocked accounts
+ * are already filtered out of feeds/search, but a direct link (or a
+ * block created after the post was loaded) could still let someone
+ * reach the action — this is the actual enforcement boundary.
+ */
+async function assertNotBlockedByPostAuthor(userId: string, postId: string) {
+  const [post] = await db
+    .select({ userId: posts.userId })
+    .from(posts)
+    .where(eq(posts.id, postId))
+    .limit(1)
+
+  if (post && (await isBlockedEitherWay(userId, post.userId))) {
+    throw new Error("You can't interact with this post.")
+  }
+}
+
 export async function likePost(postId: string): Promise<InteractionResult> {
   try {
     const userId = await getUserId()
+    await assertNotBlockedByPostAuthor(userId, postId)
     const inserted = await addInteraction(likes, "likeCount", userId, postId)
     if (inserted) await notifyPostAction(postId, userId, "like")
     return { success: true }
-  } catch {
-    return { success: false, error: "Couldn't like post." }
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Couldn't like post.",
+    }
   }
 }
 
@@ -121,11 +145,15 @@ export async function unlikePost(postId: string): Promise<InteractionResult> {
 export async function repostPost(postId: string): Promise<InteractionResult> {
   try {
     const userId = await getUserId()
+    await assertNotBlockedByPostAuthor(userId, postId)
     const inserted = await addInteraction(reposts, "repostCount", userId, postId)
     if (inserted) await notifyPostAction(postId, userId, "repost")
     return { success: true }
-  } catch {
-    return { success: false, error: "Couldn't repost." }
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Couldn't repost.",
+    }
   }
 }
 

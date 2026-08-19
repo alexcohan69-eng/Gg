@@ -187,6 +187,28 @@ const statements = [
   // Backs the inbox's per-conversation unread count (messages from the
   // other participant that this viewer hasn't read yet).
   `create index if not exists messages_conversationId_isRead_idx on "messages" ("conversationId", "isRead")`,
+
+  // Moderation MVP: blocks + reports
+  `create table if not exists "blocks" (
+    id text primary key,
+    "blockerId" text not null,
+    "blockedId" text not null,
+    "createdAt" timestamp not null default now()
+  )`,
+  `create unique index if not exists blocks_blocker_blocked_uidx on "blocks" ("blockerId", "blockedId")`,
+  `create index if not exists blocks_blockedId_idx on "blocks" ("blockedId")`,
+
+  `create table if not exists "reports" (
+    id text primary key,
+    "reporterId" text not null,
+    "targetType" text not null,
+    "targetId" text not null,
+    reason text not null,
+    "createdAt" timestamp not null default now()
+  )`,
+  // Prevents the same user from spamming duplicate reports of the same
+  // target — mirrors the likes/bookmarks/reposts onConflictDoNothing pattern.
+  `create unique index if not exists reports_reporter_target_uidx on "reports" ("reporterId", "targetType", "targetId")`,
 ]
 
 const client = await pool.connect()

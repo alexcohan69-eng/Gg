@@ -3,6 +3,7 @@ import { headers } from "next/headers"
 import { redirect } from "next/navigation"
 import { getSessionWithRetry } from "@/lib/auth"
 import { getBookmarkedPosts } from "@/lib/posts"
+import { getBlockedUserIds } from "@/lib/blocks"
 import { PageHeader } from "@/components/page-header"
 import { PostList } from "@/components/post-list"
 import { BookmarkIcon } from "lucide-react"
@@ -15,7 +16,8 @@ export default async function BookmarksPage() {
   const session = await getSessionWithRetry({ headers: await headers() })
   if (!session?.user) redirect("/sign-in")
 
-  const posts = await getBookmarkedPosts(session.user.id)
+  const blockedUserIds = await getBlockedUserIds(session.user.id)
+  const posts = await getBookmarkedPosts(session.user.id, blockedUserIds)
 
   return (
     <div className="flex flex-col">

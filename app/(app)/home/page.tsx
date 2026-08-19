@@ -5,6 +5,7 @@ import { redirect } from "next/navigation"
 import { getSessionWithRetry } from "@/lib/auth"
 import { getFeedPosts, getFollowingFeed } from "@/lib/posts"
 import { getFollowCounts } from "@/lib/follows"
+import { getBlockedUserIds } from "@/lib/blocks"
 import { PageHeader } from "@/components/page-header"
 import { PostComposer } from "@/components/post-composer"
 import { PostList } from "@/components/post-list"
@@ -31,10 +32,12 @@ export default async function HomePage({
   const session = await getSessionWithRetry({ headers: await headers() })
   if (!session?.user) redirect("/sign-in")
 
+  const blockedUserIds = await getBlockedUserIds(session.user.id)
+
   const [posts, followCounts] = await Promise.all([
     activeTab === "following"
-      ? getFollowingFeed(session.user.id)
-      : getFeedPosts(session.user.id),
+      ? getFollowingFeed(session.user.id, blockedUserIds)
+      : getFeedPosts(session.user.id, blockedUserIds),
     getFollowCounts(session.user.id),
   ])
 

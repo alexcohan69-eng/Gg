@@ -1,7 +1,18 @@
-import { and, asc, desc, eq, inArray, sql } from "drizzle-orm"
+import { and, asc, desc, eq, inArray, notInArray, sql } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { bookmarks, follows, likes, posts, reposts, user } from "@/lib/db/schema"
 import type { MediaAttachment } from "@/lib/media"
+
+/**
+ * `notInArray` with an empty list isn't a no-op filter in SQL (it can
+ * behave unexpectedly across drivers), so every call site below skips
+ * adding the condition entirely when there's nothing to exclude.
+ */
+function excludeAuthorsCondition(excludeUserIds: Set<string>) {
+  return excludeUserIds.size > 0
+    ? notInArray(posts.userId, [...excludeUserIds])
+    : undefined
+}
 
 /**
  * A post joined with its author's public profile fields plus the
@@ -70,6 +81,7 @@ export function withLikeAndRepostJoins(query: any, viewerId: string) {
  */
 export async function getFeedPosts(
   viewerId: string,
+  excludeUserIds: Set<string> = new Set(),
   limit = FEED_PAGE_SIZE,
 ): Promise<FeedPost[]> {
   const query = db
@@ -87,7 +99,7 @@ export async function getFeedPosts(
     )
 
   return withLikeAndRepostJoins(query, viewerId)
-    .where(eq(posts.isReply, false))
+    .where(and(eq(posts.isReply, false), excludeAuthorsCondition(excludeUserIds)))
     .orderBy(desc(posts.createdAt))
     .limit(limit)
 }
@@ -101,6 +113,7 @@ export async function getFeedPosts(
  */
 export async function getFollowingFeed(
   viewerId: string,
+  excludeUserIds: Set<string> = new Set(),
   limit = FEED_PAGE_SIZE,
 ): Promise<FeedPost[]> {
   const followingRows = await db
@@ -125,7 +138,13 @@ export async function getFollowingFeed(
     )
 
   return withLikeAndRepostJoins(query, viewerId)
-    .where(and(eq(posts.isReply, false), inArray(posts.userId, authorIds)))
+    .where(
+      and(
+        eq(posts.isReply, false),
+        inArray(posts.userId, authorIds),
+        excludeAuthorsCondition(excludeUserIds),
+      ),
+    )
     .orderBy(desc(posts.createdAt))
     .limit(limit)
 }
@@ -164,6 +183,7 @@ export async function getUserPosts(
  */
 export async function getBookmarkedPosts(
   viewerId: string,
+  excludeUserIds: Set<string> = new Set(),
   limit = FEED_PAGE_SIZE,
 ): Promise<FeedPost[]> {
   const query = db
@@ -178,7 +198,7 @@ export async function getBookmarkedPosts(
     .innerJoin(user, eq(posts.userId, user.id))
 
   return withLikeAndRepostJoins(query, viewerId)
-    .where(eq(bookmarks.userId, viewerId))
+    .where(and(eq(bookmarks.userId, viewerId), excludeAuthorsCondition(excludeUserIds)))
     .orderBy(desc(bookmarks.createdAt))
     .limit(limit)
 }
@@ -223,6 +243,7 @@ export async function getPostById(
 export async function getPostReplies(
   postId: string,
   viewerId: string,
+  excludeUserIds: Set<string> = new Set(),
   limit = FEED_PAGE_SIZE,
 ): Promise<FeedPost[]> {
   const query = db
@@ -240,7 +261,7 @@ export async function getPostReplies(
     )
 
   return withLikeAndRepostJoins(query, viewerId)
-    .where(eq(posts.replyToId, postId))
+    .where(and(eq(posts.replyToId, postId), excludeAuthorsCondition(excludeUserIds)))
     .orderBy(asc(posts.createdAt))
     .limit(limit)
 }
