@@ -2,6 +2,7 @@ import { headers } from "next/headers"
 import { type NextRequest, NextResponse } from "next/server"
 import { get } from "@vercel/blob"
 import { getSessionWithRetry } from "@/lib/auth"
+import { logActionError } from "@/lib/log-action-error"
 
 /**
  * Streams a privately-stored post attachment (image, GIF, or video) to
@@ -68,7 +69,7 @@ export async function GET(request: NextRequest) {
       },
     })
   } catch (error) {
-    console.error("[v0] Failed to serve media:", error)
+    logActionError("serveMedia", error, { userId: session.user.id, pathname })
     return NextResponse.json({ error: "Failed to load media" }, { status: 500 })
   }
 }

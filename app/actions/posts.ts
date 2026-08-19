@@ -9,6 +9,7 @@ import { db } from "@/lib/db"
 import { posts } from "@/lib/db/schema"
 import { createNotification } from "@/lib/notifications"
 import { isBlockedEitherWay } from "@/lib/blocks"
+import { logActionError } from "@/lib/log-action-error"
 import {
   MAX_MEDIA_PER_POST,
   validateMediaAttachments,
@@ -210,7 +211,7 @@ export async function deletePost(postId: string): Promise<PostActionResult> {
     try {
       await del(pathnames)
     } catch (error) {
-      console.error("[v0] Failed to delete post media from blob:", error)
+      logActionError("deletePostMedia", error, { postId })
     }
   }
 

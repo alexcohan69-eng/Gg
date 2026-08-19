@@ -1,6 +1,7 @@
 import { headers } from "next/headers"
 import { NextResponse } from "next/server"
 import { getSessionWithRetry } from "@/lib/auth"
+import { logActionError } from "@/lib/log-action-error"
 import { getUnreadNotificationCount } from "@/lib/notifications"
 import { getUnreadMessageCount } from "@/lib/messages"
 
@@ -25,7 +26,7 @@ export async function GET() {
 
     return NextResponse.json({ unreadNotificationsCount, unreadMessagesCount })
   } catch (error) {
-    console.error("[v0] Failed to load badge counts:", error)
+    logActionError("getBadgeCounts", error, { userId: session.user.id })
     return NextResponse.json(
       { error: "Couldn't load badge counts." },
       { status: 500 },
