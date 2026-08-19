@@ -4,7 +4,7 @@ import { redirect } from "next/navigation"
 import { getSessionWithRetry } from "@/lib/auth"
 import { getUserPosts } from "@/lib/posts"
 import { getFollowCounts } from "@/lib/follows"
-import { PageHeader } from "@/components/page-header"
+import { ProfileStickyHeader } from "@/components/profile-sticky-header"
 import { ProfileHeader } from "@/components/profile-header"
 import { PostList } from "@/components/post-list"
 import { MessageSquareTextIcon } from "lucide-react"
@@ -39,7 +39,10 @@ export default async function ProfilePage() {
 
   return (
     <div className="flex flex-col">
-      <PageHeader title={user.name} description={`@${user.username ?? "user"}`} />
+      <ProfileStickyHeader
+        name={user.name}
+        username={user.username ?? "user"}
+      />
 
       <ProfileHeader
         name={user.name}

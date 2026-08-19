@@ -129,6 +129,15 @@ export function ProfileHeader({
           <p className="text-sm text-muted-foreground">@{username ?? "user"}</p>
         </div>
 
+        {/* Marks where the name/handle above scrolls out from under the
+            sticky header, so ProfileStickyHeader knows when to reveal
+            its own copy instead of showing both at once. */}
+        <div
+          id="profile-identity-sentinel"
+          className="h-px w-full"
+          aria-hidden="true"
+        />
+
         {bio ? (
           <p className="mt-3 max-w-prose text-sm leading-relaxed text-foreground">
             {bio}

@@ -3,6 +3,7 @@ import { headers } from "next/headers"
 import { redirect } from "next/navigation"
 import { getSessionWithRetry } from "@/lib/auth"
 import { PageHeader } from "@/components/page-header"
+import { ProfileImageEditor } from "@/components/profile-image-editor"
 import { ProfileSettingsForm } from "@/components/profile-settings-form"
 import { SignOutButton } from "@/components/sign-out-button"
 import {
@@ -27,6 +28,7 @@ export default async function SettingsPage() {
     bio?: string | null
     website?: string | null
     location?: string | null
+    bannerImage?: string | null
   }
 
   return (
@@ -41,7 +43,12 @@ export default async function SettingsPage() {
               This appears on your public profile page.
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex flex-col gap-6">
+            <ProfileImageEditor
+              name={user.name}
+              avatarUrl={user.image ?? null}
+              bannerUrl={user.bannerImage ?? null}
+            />
             <ProfileSettingsForm
               profile={{
                 name: user.name,

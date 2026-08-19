@@ -5,12 +5,13 @@ import { getSessionWithRetry } from "@/lib/auth"
 import { logActionError } from "@/lib/log-action-error"
 
 /**
- * Streams a privately-stored post attachment (image, GIF, or video) to
- * any authenticated user. Attachments are viewable by anyone who can
- * see the post (this is a public feed), so the only check here is "is
- * there a session at all" — not ownership. Mutating actions
- * (uploading, deleting) are the ones scoped to the owning user, in
- * /api/upload and the post delete action.
+ * Streams a privately-stored post attachment or profile image
+ * (avatar/banner) to any authenticated user. Both are viewable by
+ * anyone who can see the post or profile (this is a public feed), so
+ * the only check here is "is there a session at all" — not
+ * ownership. Mutating actions (uploading, deleting) are the ones
+ * scoped to the owning user, in /api/upload,
+ * /api/upload/profile-image, and the post delete action.
  *
  * The incoming `Range` header (used by `<video>` for seeking) is
  * forwarded to the underlying blob fetch, and the response is relayed
@@ -27,7 +28,10 @@ export async function GET(request: NextRequest) {
   }
 
   const pathname = request.nextUrl.searchParams.get("pathname")
-  if (!pathname || !pathname.startsWith("posts/")) {
+  if (
+    !pathname ||
+    !(pathname.startsWith("posts/") || pathname.startsWith("profile/"))
+  ) {
     return NextResponse.json({ error: "Invalid pathname" }, { status: 400 })
   }
 
