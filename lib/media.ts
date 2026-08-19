@@ -126,6 +126,25 @@ export function validateImageFile(file: {
   return validateMediaFile(file)
 }
 
+/**
+ * Recovers the Blob pathname (e.g. "posts/<userId>/<file>") from one of
+ * our own /api/media delivery URLs, so callers that only have the
+ * public-facing URL (createPost's own cleanup, and the admin
+ * post-removal action in app/actions/admin.ts) can pass it to
+ * `del()`. Shared here — rather than left local to app/actions/posts.ts —
+ * because a "use server" file can only export async functions.
+ */
+export function mediaUrlToPathname(url: string): string | null {
+  try {
+    const pathname = new URL(url, "http://localhost").searchParams.get(
+      "pathname",
+    )
+    return pathname && pathname.startsWith("posts/") ? pathname : null
+  } catch {
+    return null
+  }
+}
+
 /** Avatar/banner uploads allow images and GIFs, but never video. */
 export const ALLOWED_PROFILE_IMAGE_TYPES = [
   ...ALLOWED_IMAGE_TYPES,

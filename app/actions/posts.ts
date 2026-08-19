@@ -12,6 +12,7 @@ import { isBlockedEitherWay } from "@/lib/blocks"
 import { logActionError } from "@/lib/log-action-error"
 import {
   MAX_MEDIA_PER_POST,
+  mediaUrlToPathname,
   validateMediaAttachments,
   type MediaAttachment,
   type MediaType,
@@ -69,18 +70,6 @@ function parseMediaAttachments(formData: FormData): MediaAttachment[] | null {
   if (validateMediaAttachments(media)) return null
 
   return media
-}
-
-/** Exported for reuse by the admin post-removal action (app/actions/admin.ts). */
-export function mediaUrlToPathname(url: string): string | null {
-  try {
-    const pathname = new URL(url, "http://localhost").searchParams.get(
-      "pathname",
-    )
-    return pathname && pathname.startsWith("posts/") ? pathname : null
-  } catch {
-    return null
-  }
 }
 
 export type PostActionResult = {

@@ -7,7 +7,7 @@ import { db } from "@/lib/db"
 import { posts, reports } from "@/lib/db/schema"
 import { requireAdminUserId } from "@/lib/admin"
 import { logActionError } from "@/lib/log-action-error"
-import { mediaUrlToPathname } from "@/app/actions/posts"
+import { mediaUrlToPathname } from "@/lib/media"
 
 export type AdminActionResult = {
   success: boolean

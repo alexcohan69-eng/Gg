@@ -50,7 +50,12 @@ export default async function AdminPage({
         <Tabs defaultValue={status} key={status}>
           <TabsList>
             {STATUSES.map((s) => (
-              <TabsTrigger key={s} value={s} render={<Link href={`/admin?status=${s}`} />}>
+              <TabsTrigger
+                key={s}
+                value={s}
+                render={<Link href={`/admin?status=${s}`} />}
+                nativeButton={false}
+              >
                 {s === "open" ? "Open" : s === "resolved" ? "Resolved" : "Dismissed"}
               </TabsTrigger>
             ))}
