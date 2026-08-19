@@ -6,6 +6,7 @@ import { and, eq, or } from "drizzle-orm"
 import { getSessionWithRetry } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { blocks, follows } from "@/lib/db/schema"
+import { logActionError } from "@/lib/log-action-error"
 
 async function getUserId() {
   const session = await getSessionWithRetry({ headers: await headers() })
@@ -65,7 +66,8 @@ export async function blockUser(
 
     revalidateBlockPaths(profileIdentifier)
     return { success: true }
-  } catch {
+  } catch (error) {
+    logActionError("blockUser", error, { targetUserId })
     return { success: false, error: "Couldn't block user." }
   }
 }
@@ -83,7 +85,8 @@ export async function unblockUser(
 
     revalidateBlockPaths(profileIdentifier)
     return { success: true }
-  } catch {
+  } catch (error) {
+    logActionError("unblockUser", error, { targetUserId })
     return { success: false, error: "Couldn't unblock user." }
   }
 }
