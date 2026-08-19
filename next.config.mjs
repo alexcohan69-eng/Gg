@@ -30,10 +30,11 @@ const nextConfig = {
             // scripts, so an enforcing script-src would need a nonce
             // first. This still surfaces violations in the console
             // without risking breakage. All app data (posts, media,
-            // auth) is same-origin, so connect-src stays scoped to 'self'.
+            // auth) is same-origin, so connect-src stays scoped to
+            // 'self' plus the Vercel Toolbar's own origins below.
             key: "Content-Security-Policy-Report-Only",
             value:
-              "default-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'; font-src 'self' data:; base-uri 'self'; form-action 'self'; frame-ancestors 'self'",
+              "default-src 'self'; img-src 'self' data: blob: https://vercel.live https://vercel.com https://*.vercel.com; media-src 'self' blob:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://vercel.live; connect-src 'self' https://vercel.live wss://*.pusher.com; frame-src https://vercel.live; font-src 'self' data:; base-uri 'self'; form-action 'self'; frame-ancestors 'self'",
           },
         ],
       },

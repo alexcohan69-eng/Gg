@@ -61,3 +61,24 @@ export const auth = betterAuth({
       }
     : {}),
 })
+
+/**
+ * `auth.api.getSession` hits the database, so a transient Aurora
+ * hiccup (cold-start connection delay, a dropped connection, etc.)
+ * throws instead of resolving. That's called from the root `(app)`
+ * layout on every authenticated page, so letting it throw would take
+ * the whole app down to the error boundary on a hiccup that a retry
+ * would likely clear. Degrade to "no session" instead — the caller's
+ * existing unauthenticated path (redirect to sign-in) already handles
+ * that safely, and the user can simply retry.
+ */
+export async function getSessionSafe(
+  ...args: Parameters<typeof auth.api.getSession>
+) {
+  try {
+    return await auth.api.getSession(...args)
+  } catch (error) {
+    console.error("[v0] getSession failed, treating as signed out:", error)
+    return null
+  }
+}
