@@ -5,6 +5,7 @@ import { redirect } from "next/navigation"
 import { auth } from "@/lib/auth"
 import { getFeedPosts, getFollowingFeed } from "@/lib/posts"
 import { getFollowCounts } from "@/lib/follows"
+import { loadMoreFollowingFeed, loadMoreHomeFeed } from "@/app/actions/feed"
 import { PageHeader } from "@/components/page-header"
 import { PostComposer } from "@/components/post-composer"
 import { PostList } from "@/components/post-list"
@@ -85,6 +86,9 @@ export default async function HomePage({
             activeTab === "following"
               ? "The accounts you follow haven't posted anything yet."
               : "Be the first to post — everything shared here shows up in the home timeline."
+          }
+          loadMore={
+            activeTab === "following" ? loadMoreFollowingFeed : loadMoreHomeFeed
           }
         />
       )}

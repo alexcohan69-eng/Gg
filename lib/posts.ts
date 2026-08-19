@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, sql } from "drizzle-orm"
+import { and, asc, desc, eq, inArray, lt, sql } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { bookmarks, follows, likes, posts, reposts, user } from "@/lib/db/schema"
 import type { MediaAttachment } from "@/lib/media"
@@ -26,15 +26,32 @@ export type FeedPost = {
   isBookmarked: boolean
   isReposted: boolean
   replyToId: string | null
+  /**
+   * The timestamp this row is ordered by in whichever list it came
+   * from — `createdAt` for every feed except bookmarks, where it's the
+   * bookmark's own `createdAt`. "Load more" cursors on this field
+   * instead of `createdAt` so paging through bookmarks stays correct
+   * even though its sort order isn't the post's creation time.
+   */
+  sortKey: Date
 }
 
-const FEED_PAGE_SIZE = 30
+/**
+ * Exported so callers (the "load more" server actions and the client
+ * `PostFeed` component) can tell whether a page came back full — the
+ * signal that there might be another page after it — without
+ * duplicating this number.
+ */
+export const FEED_PAGE_SIZE = 30
 
 export const feedBaseSelection = {
   id: posts.id,
   content: posts.content,
   media: posts.media,
   createdAt: posts.createdAt,
+  // Default pagination cursor — every query below overrides this with
+  // its own actual sort column when that differs (only `bookmarks` needs to).
+  sortKey: posts.createdAt,
   likeCount: posts.likeCount,
   replyCount: posts.replyCount,
   repostCount: posts.repostCount,
@@ -71,6 +88,8 @@ export function withLikeAndRepostJoins(query: any, viewerId: string) {
 export async function getFeedPosts(
   viewerId: string,
   limit = FEED_PAGE_SIZE,
+  /** When set, only posts older than this (for "load more") are returned. */
+  before?: Date,
 ): Promise<FeedPost[]> {
   const query = db
     .select({
@@ -87,7 +106,12 @@ export async function getFeedPosts(
     )
 
   return withLikeAndRepostJoins(query, viewerId)
-    .where(eq(posts.isReply, false))
+    .where(
+      and(
+        eq(posts.isReply, false),
+        before ? lt(posts.createdAt, before) : undefined,
+      ),
+    )
     .orderBy(desc(posts.createdAt))
     .limit(limit)
 }
@@ -102,6 +126,7 @@ export async function getFeedPosts(
 export async function getFollowingFeed(
   viewerId: string,
   limit = FEED_PAGE_SIZE,
+  before?: Date,
 ): Promise<FeedPost[]> {
   const followingRows = await db
     .select({ followingId: follows.followingId })
@@ -125,7 +150,13 @@ export async function getFollowingFeed(
     )
 
   return withLikeAndRepostJoins(query, viewerId)
-    .where(and(eq(posts.isReply, false), inArray(posts.userId, authorIds)))
+    .where(
+      and(
+        eq(posts.isReply, false),
+        inArray(posts.userId, authorIds),
+        before ? lt(posts.createdAt, before) : undefined,
+      ),
+    )
     .orderBy(desc(posts.createdAt))
     .limit(limit)
 }
@@ -135,6 +166,7 @@ export async function getUserPosts(
   userId: string,
   viewerId: string,
   limit = FEED_PAGE_SIZE,
+  before?: Date,
 ): Promise<FeedPost[]> {
   const query = db
     .select({
@@ -151,7 +183,13 @@ export async function getUserPosts(
     )
 
   return withLikeAndRepostJoins(query, viewerId)
-    .where(and(eq(posts.userId, userId), eq(posts.isReply, false)))
+    .where(
+      and(
+        eq(posts.userId, userId),
+        eq(posts.isReply, false),
+        before ? lt(posts.createdAt, before) : undefined,
+      ),
+    )
     .orderBy(desc(posts.createdAt))
     .limit(limit)
 }
@@ -165,10 +203,15 @@ export async function getUserPosts(
 export async function getBookmarkedPosts(
   viewerId: string,
   limit = FEED_PAGE_SIZE,
+  /** Cursor is the bookmark's own `createdAt`, not the post's. */
+  before?: Date,
 ): Promise<FeedPost[]> {
   const query = db
     .select({
       ...feedBaseSelection,
+      // Override the default (post's createdAt): this list is ordered
+      // by when the viewer bookmarked the post, not when it was posted.
+      sortKey: bookmarks.createdAt,
       isLiked: sql<boolean>`${likes.id} is not null`,
       isBookmarked: sql<boolean>`true`,
       isReposted: sql<boolean>`${reposts.id} is not null`,
@@ -178,7 +221,12 @@ export async function getBookmarkedPosts(
     .innerJoin(user, eq(posts.userId, user.id))
 
   return withLikeAndRepostJoins(query, viewerId)
-    .where(eq(bookmarks.userId, viewerId))
+    .where(
+      and(
+        eq(bookmarks.userId, viewerId),
+        before ? lt(bookmarks.createdAt, before) : undefined,
+      ),
+    )
     .orderBy(desc(bookmarks.createdAt))
     .limit(limit)
 }

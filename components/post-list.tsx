@@ -6,6 +6,7 @@ import {
   EmptyDescription,
 } from "@/components/ui/empty"
 import { PostCard } from "@/components/post-card"
+import { PostFeed } from "@/components/post-feed"
 import type { FeedPost } from "@/lib/posts"
 import type { LucideIcon } from "lucide-react"
 
@@ -15,12 +16,19 @@ export function PostList({
   emptyIcon: EmptyIcon,
   emptyTitle,
   emptyDescription,
+  loadMore,
 }: {
   posts: FeedPost[]
   currentUserId: string
   emptyIcon: LucideIcon
   emptyTitle: string
   emptyDescription: string
+  /**
+   * When provided, renders a "Load more" control that pages through
+   * older posts via this bound server action. Omit it for lists that
+   * are always shown in full (e.g. a post's replies).
+   */
+  loadMore?: (before: Date) => Promise<FeedPost[]>
 }) {
   if (posts.length === 0) {
     return (
@@ -35,6 +43,16 @@ export function PostList({
           </EmptyHeader>
         </Empty>
       </div>
+    )
+  }
+
+  if (loadMore) {
+    return (
+      <PostFeed
+        initialPosts={posts}
+        currentUserId={currentUserId}
+        loadMore={loadMore}
+      />
     )
   }
 
