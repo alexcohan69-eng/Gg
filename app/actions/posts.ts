@@ -71,7 +71,8 @@ function parseMediaAttachments(formData: FormData): MediaAttachment[] | null {
   return media
 }
 
-function mediaUrlToPathname(url: string): string | null {
+/** Exported for reuse by the admin post-removal action (app/actions/admin.ts). */
+export function mediaUrlToPathname(url: string): string | null {
   try {
     const pathname = new URL(url, "http://localhost").searchParams.get(
       "pathname",

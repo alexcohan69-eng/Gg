@@ -204,11 +204,16 @@ const statements = [
     "targetType" text not null,
     "targetId" text not null,
     reason text not null,
+    status text not null default 'open',
+    "reviewedBy" text,
+    "reviewedAt" timestamp,
     "createdAt" timestamp not null default now()
   )`,
   // Prevents the same user from spamming duplicate reports of the same
   // target — mirrors the likes/bookmarks/reposts onConflictDoNothing pattern.
   `create unique index if not exists reports_reporter_target_uidx on "reports" ("reporterId", "targetType", "targetId")`,
+  // Backs the admin review queue's "open reports first" listing.
+  `create index if not exists reports_status_createdAt_idx on "reports" ("status", "createdAt" desc)`,
 ]
 
 const client = await pool.connect()
