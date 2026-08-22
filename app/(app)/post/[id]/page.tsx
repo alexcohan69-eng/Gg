@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation"
 import { getSessionWithRetry } from "@/lib/auth"
 import { getPostById, getPostReplies } from "@/lib/posts"
 import { getBlockedUserIds } from "@/lib/blocks"
+import { stripHtmlToText } from "@/lib/sanitize-html"
 import { PageHeader } from "@/components/page-header"
 import { BackButton } from "@/components/back-button"
 import { PostCard } from "@/components/post-card"
@@ -29,8 +30,9 @@ export async function generateMetadata({
     return { title: "Post" }
   }
 
+  const plainContent = stripHtmlToText(post.content)
   const excerpt =
-    post.content.length > 60 ? `${post.content.slice(0, 60)}...` : post.content
+    plainContent.length > 60 ? `${plainContent.slice(0, 60)}...` : plainContent
 
   return {
     title: `${post.authorName} on Pulse: "${excerpt}"`,

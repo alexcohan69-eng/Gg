@@ -4,7 +4,8 @@ import { useState } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import useSWR from "swr"
-import { Menu, LogOut, ShieldIcon } from "lucide-react"
+import { Menu, LogOut, ShieldIcon, MoonIcon, SunIcon } from "lucide-react"
+import { useTheme } from "next-themes"
 import { Logo } from "@/components/logo"
 import { UserMenu } from "@/components/user-menu"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -52,6 +53,38 @@ function initials(name: string) {
 
 function isActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`)
+}
+
+/** Light/dark toggle styled to match the sidebar nav rows. The icon
+ * *and* label switch purely via the `dark:` CSS class — like
+ * next-themes' own docs recommend — rather than branching JSX on
+ * `resolvedTheme`, which is `undefined` on the server and would
+ * otherwise render different text server- vs client-side and trip a
+ * hydration mismatch. `resolvedTheme` is only read inside the click
+ * handler, which is client-only, so it's safe to use there. */
+function ThemeToggleRow({ variant }: { variant: "desktop" | "mobile" }) {
+  const { resolvedTheme, setTheme } = useTheme()
+
+  return (
+    <button
+      type="button"
+      onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
+      className={cn(
+        "flex items-center gap-4 rounded-full px-3 py-3 text-base font-medium text-foreground transition-colors hover:bg-accent",
+        variant === "desktop" && "justify-center lg:justify-start",
+      )}
+      aria-label="Toggle color theme"
+    >
+      <span className="relative shrink-0">
+        <SunIcon className="hidden size-6 dark:inline" aria-hidden="true" />
+        <MoonIcon className="inline size-6 dark:hidden" aria-hidden="true" />
+      </span>
+      <span className={cn(variant === "desktop" && "hidden lg:inline")}>
+        <span className="hidden dark:inline">Light mode</span>
+        <span className="inline dark:hidden">Dark mode</span>
+      </span>
+    </button>
+  )
 }
 
 type BadgeCounts = { unreadNotificationsCount: number; unreadMessagesCount: number }
@@ -179,7 +212,10 @@ export function AppShell({
             ) : null}
           </nav>
         </div>
-        <UserMenu user={user} />
+        <div className="flex flex-col gap-2">
+          <ThemeToggleRow variant="desktop" />
+          <UserMenu user={user} />
+        </div>
       </aside>
 
       {/* Main content column */}
@@ -251,14 +287,17 @@ export function AppShell({
                     </Link>
                   ) : null}
                 </nav>
-                <Button
-                  variant="ghost"
-                  className="mt-4 justify-start gap-4 px-3 text-base font-medium"
-                  onClick={handleSignOut}
-                >
-                  <LogOut className="size-5" aria-hidden="true" />
-                  Sign out
-                </Button>
+                <div className="flex flex-col gap-1 border-t border-border pt-4">
+                  <ThemeToggleRow variant="mobile" />
+                  <Button
+                    variant="ghost"
+                    className="justify-start gap-4 px-3 text-base font-medium"
+                    onClick={handleSignOut}
+                  >
+                    <LogOut className="size-5" aria-hidden="true" />
+                    Sign out
+                  </Button>
+                </div>
               </div>
             </SheetContent>
           </Sheet>

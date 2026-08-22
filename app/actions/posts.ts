@@ -10,6 +10,7 @@ import { posts } from "@/lib/db/schema"
 import { createNotification } from "@/lib/notifications"
 import { isBlockedEitherWay } from "@/lib/blocks"
 import { logActionError } from "@/lib/log-action-error"
+import { isHtmlContentEmpty, sanitizePostHtml } from "@/lib/sanitize-html"
 import {
   MAX_MEDIA_PER_POST,
   mediaUrlToPathname,
@@ -23,8 +24,6 @@ async function getUserId() {
   if (!session?.user) throw new Error("Unauthorized")
   return session.user.id
 }
-
-const MAX_POST_LENGTH = 280
 
 // Matches the delivery URL /api/upload returns: /api/media?pathname=posts%2F<userId>%2F<file>
 const MEDIA_URL_PATTERN = /^\/api\/media\?pathname=posts%2F[^&]+$/
@@ -88,7 +87,10 @@ export async function createPost(
 ): Promise<PostActionResult> {
   const userId = await getUserId()
 
-  const content = String(formData.get("content") ?? "").trim()
+  // The composer submits rich-text HTML (bold/italic/links/lists/etc).
+  // Sanitize it here — this is the real security boundary, since the
+  // client-side editor only constrains the UI, not the request body.
+  const content = sanitizePostHtml(String(formData.get("content") ?? ""))
   const replyToIdRaw = formData.get("replyToId")
   const replyToId = replyToIdRaw ? String(replyToIdRaw) : null
   const media = parseMediaAttachments(formData)
@@ -96,14 +98,8 @@ export async function createPost(
   if (media === null) {
     return { success: false, error: "Invalid media attachment." }
   }
-  if (!content && media.length === 0) {
+  if (isHtmlContentEmpty(content) && media.length === 0) {
     return { success: false, error: "Post can't be empty." }
-  }
-  if (content.length > MAX_POST_LENGTH) {
-    return {
-      success: false,
-      error: `Post must be ${MAX_POST_LENGTH} characters or fewer.`,
-    }
   }
 
   let parentAuthorId: string | null = null

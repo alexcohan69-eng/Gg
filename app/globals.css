@@ -163,3 +163,43 @@
     @apply bg-background text-foreground font-sans;
   }
 }
+
+/* Rich-text post content — shared by the composer's editable surface
+   and the read-only rendering in PostCard, so formatting looks
+   identical while typing and after posting. */
+@layer components {
+  .prose-post {
+    & p {
+      @apply my-0;
+    }
+    & p + p {
+      @apply mt-3;
+    }
+    & a {
+      @apply text-primary underline underline-offset-2 hover:no-underline;
+    }
+    & ul,
+    & ol {
+      @apply my-2 ml-5 flex flex-col gap-1;
+    }
+    & ul {
+      @apply list-disc;
+    }
+    & ol {
+      @apply list-decimal;
+    }
+    & blockquote {
+      @apply my-2 border-l-2 border-primary/40 pl-3 text-muted-foreground italic;
+    }
+    & code {
+      @apply rounded bg-muted px-1.5 py-0.5 font-mono text-[0.85em] text-foreground;
+    }
+    & strong {
+      @apply font-semibold;
+    }
+    &.is-editor-empty:first-child::before {
+      content: attr(data-placeholder);
+      @apply pointer-events-none float-left h-0 text-muted-foreground;
+    }
+  }
+}

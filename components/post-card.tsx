@@ -33,6 +33,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { ReportDialog } from "@/components/report-dialog"
 import { cn, getInitials, formatRelativeTime, profileHref } from "@/lib/utils"
+import { sanitizePostHtml } from "@/lib/sanitize-html"
 import type { FeedPost } from "@/lib/posts"
 
 /**
@@ -230,9 +231,13 @@ export function PostCard({
 
         <ClickWrapper href={detailHref} disabled={!linkToDetail}>
           {post.content ? (
-            <p className="whitespace-pre-wrap text-pretty break-words text-sm leading-relaxed text-foreground">
-              {post.content}
-            </p>
+            <div
+              className="prose-post text-pretty break-words text-sm leading-relaxed text-foreground"
+              // Sanitized again here (defense-in-depth) even though
+              // createPost already sanitizes before storing — this is
+              // the only dangerouslySetInnerHTML call for post content.
+              dangerouslySetInnerHTML={{ __html: sanitizePostHtml(post.content) }}
+            />
           ) : null}
         </ClickWrapper>
 

@@ -27,6 +27,7 @@ import { Empty, EmptyDescription, EmptyTitle } from "@/components/ui/empty"
 import { REPORT_REASONS } from "@/lib/moderation"
 import type { ReportRow, ReportStatus } from "@/lib/reports"
 import { formatRelativeTime, profileHref } from "@/lib/utils"
+import { stripHtmlToText } from "@/lib/sanitize-html"
 
 function reasonLabel(reason: string) {
   return REPORT_REASONS.find((r) => r.value === reason)?.label ?? reason
@@ -54,7 +55,9 @@ function TargetPreview({ target }: { target: ReportRow["target"] }) {
           </span>
         </Link>
         <p className="mt-1 line-clamp-3 text-sm text-pretty text-foreground">
-          {target.content || <span className="italic text-muted-foreground">No text content</span>}
+          {stripHtmlToText(target.content) || (
+            <span className="italic text-muted-foreground">No text content</span>
+          )}
         </p>
       </div>
     )
