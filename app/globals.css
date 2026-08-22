@@ -197,7 +197,10 @@
     & strong {
       @apply font-semibold;
     }
-    &.is-editor-empty:first-child::before {
+    /* Tiptap's Placeholder extension puts `is-editor-empty` on the first
+       empty node (the paragraph), not on the editor root, so this has to
+       be a descendant selector rather than `&.is-editor-empty`. */
+    & p.is-editor-empty:first-child::before {
       content: attr(data-placeholder);
       @apply pointer-events-none float-left h-0 text-muted-foreground;
     }

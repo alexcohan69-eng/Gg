@@ -1,6 +1,13 @@
 "use client"
 
-import { useEffect, useRef, useState, useTransition, type ChangeEvent } from "react"
+import {
+  useEffect,
+  useRef,
+  useState,
+  useTransition,
+  type ChangeEvent,
+  type DragEvent,
+} from "react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
 import { ImageIcon, VideoIcon, XIcon } from "lucide-react"
@@ -144,6 +151,7 @@ function useMediaAttachments() {
 export function PostComposer({
   user,
   replyToId,
+  replyToUsername,
   placeholder = "What's happening?",
   submitLabel = "Post",
   autoFocus = false,
@@ -152,6 +160,8 @@ export function PostComposer({
   user: { name: string; image?: string | null }
   /** When set, the created post is a reply to this post id. */
   replyToId?: string
+  /** Author of the post being replied to, shown as a "Replying to @…" context line. */
+  replyToUsername?: string | null
   placeholder?: string
   submitLabel?: string
   autoFocus?: boolean
@@ -165,6 +175,8 @@ export function PostComposer({
   const [isPending, startTransition] = useTransition()
   const [isEmpty, setIsEmpty] = useState(true)
   const [isFocused, setIsFocused] = useState(autoFocus)
+  const [isDraggingOver, setIsDraggingOver] = useState(false)
+  const [showFormatting, setShowFormatting] = useState(false)
   const {
     attachments,
     addFiles,
@@ -179,15 +191,20 @@ export function PostComposer({
   const editor = useRichTextEditor({
     placeholder,
     autofocus: autoFocus,
-    onUpdate: (editor) => setIsEmpty(editor.isEmpty),
+    onUpdate: (editor) => {
+      setIsEmpty(editor.isEmpty)
+    },
   })
 
   useEffect(() => {
     if (!editor) return
     const onFocus = () => setIsFocused(true)
+    const onBlur = () => setIsFocused(!editor.isEmpty)
     editor.on("focus", onFocus)
+    editor.on("blur", onBlur)
     return () => {
       editor.off("focus", onFocus)
+      editor.off("blur", onBlur)
     }
   }, [editor])
 
@@ -205,6 +222,18 @@ export function PostComposer({
     const files = Array.from(e.target.files ?? [])
     if (files.length) addFiles(files, "video")
     e.target.value = ""
+  }
+
+  /** Lets people drag image/video files straight onto the composer instead of only using the toolbar buttons. */
+  function handleDrop(e: DragEvent<HTMLFormElement>) {
+    e.preventDefault()
+    setIsDraggingOver(false)
+    const files = Array.from(e.dataTransfer.files)
+    if (!files.length) return
+    const videos = files.filter((f) => f.type.startsWith("video/"))
+    const images = files.filter((f) => !f.type.startsWith("video/"))
+    if (videos.length) addFiles(videos, "video")
+    if (images.length) addFiles(images, "image")
   }
 
   function handleSubmit() {
@@ -239,25 +268,59 @@ export function PostComposer({
         e.preventDefault()
         handleSubmit()
       }}
-      className="flex gap-3 border-b border-border p-4"
+      onDragOver={(e) => {
+        e.preventDefault()
+        setIsDraggingOver(true)
+      }}
+      onDragLeave={() => setIsDraggingOver(false)}
+      onDrop={handleDrop}
+      className="border-b border-border p-3 sm:p-4"
     >
-      <Avatar className="size-10 shrink-0">
-        <AvatarImage src={user.image ?? undefined} alt={user.name} />
-        <AvatarFallback>{getInitials(user.name)}</AvatarFallback>
-      </Avatar>
+      {/* Single elevated surface so the composer reads as one focused
+          object rather than a loose stack of controls. */}
+      <div
+        className={cn(
+          "relative flex flex-col gap-2 rounded-3xl border border-border bg-card/50 p-2 shadow-xs transition-all duration-200",
+          isFocused && "border-primary/40 bg-card shadow-sm ring-4 ring-primary/10",
+          isDraggingOver && "border-dashed border-primary bg-primary/5",
+        )}
+      >
+        {isDraggingOver ? (
+          <div className="pointer-events-none absolute inset-0 z-10 grid place-items-center rounded-3xl bg-primary/5">
+            <span className="rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground shadow-sm">
+              Drop to attach
+            </span>
+          </div>
+        ) : null}
 
-      <div className="flex flex-1 flex-col gap-3">
+        {replyToUsername ? (
+          <p className="px-2 pt-1 text-sm text-muted-foreground">
+            Replying to <span className="font-medium text-primary">@{replyToUsername}</span>
+          </p>
+        ) : null}
+
         <div
-          className={cn(
-            "rounded-2xl transition-colors",
-            isFocused && "ring-1 ring-primary/30",
-          )}
+          className="flex gap-3"
+          onKeyDown={(e) => {
+            // Cmd/Ctrl+Enter submits, so people don't have to reach for the mouse.
+            if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+              e.preventDefault()
+              handleSubmit()
+            }
+          }}
         >
+          <Avatar className="mt-1 size-10 shrink-0 ring-2 ring-background">
+            <AvatarImage src={user.image ?? undefined} alt={user.name} />
+            <AvatarFallback>{getInitials(user.name)}</AvatarFallback>
+          </Avatar>
+
           <RichTextEditor
             editor={editor}
             className={cn(
-              "cursor-text py-1 text-lg leading-relaxed",
-              replyToId ? "min-h-16" : "min-h-11",
+              // Generous inner padding gives the text room to breathe and
+              // makes the whole area feel like a real, clickable input.
+              "flex-1 cursor-text px-2 py-2.5 text-[17px] leading-relaxed",
+              replyToId ? "min-h-14" : "min-h-20",
             )}
           />
         </div>
@@ -322,8 +385,16 @@ export function PostComposer({
           </ul>
         ) : null}
 
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3">
-          <div className="flex items-center gap-1">
+        {/* Formatting lives on its own row behind a toggle so the action bar
+            stays a single uncluttered line, even on narrow screens. */}
+        {showFormatting ? (
+          <div className="rounded-2xl bg-muted/50 px-1.5 py-1">
+            <RichTextToolbar editor={editor} />
+          </div>
+        ) : null}
+
+        <div className="flex items-center justify-between gap-2 border-t border-border/60 px-1 pt-2">
+          <div className="flex min-w-0 items-center gap-0.5">
             <input
               ref={imageInputRef}
               type="file"
@@ -372,14 +443,21 @@ export function PostComposer({
             <RichTextToolbar editor={editor} />
           </div>
 
-          <Button
-            type="submit"
-            className="rounded-full"
-            disabled={!canSubmit || isPending || isUploading}
-          >
-            {isPending || isUploading ? <Spinner data-icon="inline-start" /> : null}
-            {submitLabel}
-          </Button>
+          <div className="flex items-center gap-3">
+            {canSubmit ? (
+              <kbd className="hidden rounded border border-border bg-muted px-1.5 py-0.5 font-sans text-[10px] font-medium text-muted-foreground sm:inline-block">
+                ⌘ + ↵
+              </kbd>
+            ) : null}
+            <Button
+              type="submit"
+              className="rounded-full px-5 font-semibold shadow-xs transition-transform active:scale-95"
+              disabled={!canSubmit || isPending || isUploading}
+            >
+              {isPending || isUploading ? <Spinner data-icon="inline-start" /> : null}
+              {submitLabel}
+            </Button>
+          </div>
         </div>
       </div>
     </form>

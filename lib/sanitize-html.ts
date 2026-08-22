@@ -53,3 +53,18 @@ export function stripHtmlToText(html: string): string {
 export function isHtmlContentEmpty(html: string): boolean {
   return stripHtmlToText(html).length === 0
 }
+
+/**
+ * Server-side abuse guard for a post's rich-text content. This is
+ * deliberately generous — the composer imposes no user-facing character
+ * limit — and exists only to stop a crafted request from storing an
+ * unbounded blob. Counted on the plain-text length (via
+ * `stripHtmlToText`), not the raw HTML, so formatting markup never eats
+ * into the budget.
+ */
+export const MAX_POST_LENGTH = 10000
+
+/** Plain-text length of sanitized rich-text content, used for the server-side abuse guard. */
+export function getPostTextLength(html: string): number {
+  return stripHtmlToText(html).length
+}
