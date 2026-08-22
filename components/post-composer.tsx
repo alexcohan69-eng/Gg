@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef, useState, useTransition, type ChangeEvent } from "react"
+import { useEffect, useRef, useState, useTransition, type ChangeEvent } from "react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
 import { ImageIcon, VideoIcon, XIcon } from "lucide-react"
@@ -8,8 +8,12 @@ import { toast } from "sonner"
 import { createPost } from "@/app/actions/posts"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
-import { Textarea } from "@/components/ui/textarea"
 import { Spinner } from "@/components/ui/spinner"
+import {
+  RichTextEditor,
+  RichTextToolbar,
+  useRichTextEditor,
+} from "@/components/rich-text-editor"
 import { cn, getInitials } from "@/lib/utils"
 import {
   MAX_MEDIA_PER_POST,
@@ -18,8 +22,6 @@ import {
   type MediaAttachment,
   type MediaType,
 } from "@/lib/media"
-
-const MAX_POST_LENGTH = 280
 
 type Attachment = {
   id: string
@@ -91,9 +93,7 @@ function useMediaAttachments() {
           const data = await res.json()
           if (!res.ok) throw new Error(data.error ?? "Upload failed.")
           setAttachments((prev) =>
-            prev.map((a) =>
-              a.id === id ? { ...a, status: "done", url: data.url } : a,
-            ),
+            prev.map((a) => (a.id === id ? { ...a, status: "done", url: data.url } : a)),
           )
         })
         .catch((error: Error) => {
@@ -162,8 +162,9 @@ export function PostComposer({
   const formRef = useRef<HTMLFormElement>(null)
   const imageInputRef = useRef<HTMLInputElement>(null)
   const videoInputRef = useRef<HTMLInputElement>(null)
-  const [content, setContent] = useState("")
   const [isPending, startTransition] = useTransition()
+  const [isEmpty, setIsEmpty] = useState(true)
+  const [isFocused, setIsFocused] = useState(autoFocus)
   const {
     attachments,
     addFiles,
@@ -175,11 +176,23 @@ export function PostComposer({
     hasImageOrGif,
   } = useMediaAttachments()
 
-  const remaining = MAX_POST_LENGTH - content.length
-  const isEmpty = content.trim().length === 0 && attachments.length === 0
-  const isOverLimit = remaining < 0
-  const canAddMoreImages =
-    !hasVideo && attachments.length < MAX_MEDIA_PER_POST
+  const editor = useRichTextEditor({
+    placeholder,
+    autofocus: autoFocus,
+    onUpdate: (editor) => setIsEmpty(editor.isEmpty),
+  })
+
+  useEffect(() => {
+    if (!editor) return
+    const onFocus = () => setIsFocused(true)
+    editor.on("focus", onFocus)
+    return () => {
+      editor.off("focus", onFocus)
+    }
+  }, [editor])
+
+  const canSubmit = editor && (!isEmpty || attachments.length > 0)
+  const canAddMoreImages = !hasVideo && attachments.length < MAX_MEDIA_PER_POST
   const canAddVideo = !hasVideo && !hasImageOrGif
 
   function handleImagesSelected(e: ChangeEvent<HTMLInputElement>) {
@@ -194,7 +207,11 @@ export function PostComposer({
     e.target.value = ""
   }
 
-  function handleSubmit(formData: FormData) {
+  function handleSubmit() {
+    if (!editor || !canSubmit || isPending || isUploading) return
+
+    const formData = new FormData()
+    formData.set("content", editor.getHTML())
     if (replyToId) {
       formData.set("replyToId", replyToId)
     }
@@ -206,9 +223,10 @@ export function PostComposer({
         toast.error(result.error ?? "Something went wrong. Try again.")
         return
       }
-      setContent("")
+      editor.commands.clearContent(true)
+      setIsEmpty(true)
       resetAttachments()
-      formRef.current?.reset()
+      setIsFocused(autoFocus)
       onPosted?.()
       router.refresh()
     })
@@ -217,7 +235,10 @@ export function PostComposer({
   return (
     <form
       ref={formRef}
-      action={handleSubmit}
+      onSubmit={(e) => {
+        e.preventDefault()
+        handleSubmit()
+      }}
       className="flex gap-3 border-b border-border p-4"
     >
       <Avatar className="size-10 shrink-0">
@@ -226,17 +247,20 @@ export function PostComposer({
       </Avatar>
 
       <div className="flex flex-1 flex-col gap-3">
-        <Textarea
-          name="content"
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-          placeholder={placeholder}
-          aria-label={replyToId ? "Reply content" : "Post content"}
-          rows={replyToId ? 3 : 2}
-          autoFocus={autoFocus}
-          className="border-none px-0 py-1 text-lg focus-visible:ring-0"
-          disabled={isPending}
-        />
+        <div
+          className={cn(
+            "rounded-2xl transition-colors",
+            isFocused && "ring-1 ring-primary/30",
+          )}
+        >
+          <RichTextEditor
+            editor={editor}
+            className={cn(
+              "cursor-text py-1 text-lg leading-relaxed",
+              replyToId ? "min-h-16" : "min-h-11",
+            )}
+          />
+        </div>
 
         {attachments.length > 0 ? (
           <ul
@@ -298,7 +322,7 @@ export function PostComposer({
           </ul>
         ) : null}
 
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3">
           <div className="flex items-center gap-1">
             <input
               ref={imageInputRef}
@@ -342,29 +366,20 @@ export function PostComposer({
             >
               <VideoIcon />
             </Button>
+
+            <span className="mx-1 h-5 w-px bg-border" aria-hidden="true" />
+
+            <RichTextToolbar editor={editor} />
           </div>
 
-          <div className="flex items-center gap-3">
-            <span
-              className={cn(
-                "text-xs text-muted-foreground",
-                isOverLimit && "font-medium text-destructive",
-              )}
-              aria-live="polite"
-            >
-              {remaining}
-            </span>
-            <Button
-              type="submit"
-              className="rounded-full"
-              disabled={isEmpty || isOverLimit || isPending || isUploading}
-            >
-              {isPending || isUploading ? (
-                <Spinner data-icon="inline-start" />
-              ) : null}
-              {submitLabel}
-            </Button>
-          </div>
+          <Button
+            type="submit"
+            className="rounded-full"
+            disabled={!canSubmit || isPending || isUploading}
+          >
+            {isPending || isUploading ? <Spinner data-icon="inline-start" /> : null}
+            {submitLabel}
+          </Button>
         </div>
       </div>
     </form>
