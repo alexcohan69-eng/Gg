@@ -172,6 +172,13 @@ export function ProfileHeader({
           </span>
         </div>
 
+        <Link
+          href={`/profile/${profileIdentifier}/about`}
+          className="mt-3 inline-block text-sm font-medium text-primary hover:underline"
+        >
+          About this account
+        </Link>
+
         <div className="mt-4 flex gap-5 text-sm">
           <Link
             href={`/profile/${profileIdentifier}/following`}
