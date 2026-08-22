@@ -74,6 +74,7 @@ export default async function PostDetailPage({
       <PostComposer
         user={{ name: session.user.name, image: session.user.image }}
         replyToId={post.id}
+        replyToUsername={post.authorUsername}
         placeholder="Post your reply"
         submitLabel="Reply"
       />

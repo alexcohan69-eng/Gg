@@ -10,7 +10,12 @@ import { posts } from "@/lib/db/schema"
 import { createNotification } from "@/lib/notifications"
 import { isBlockedEitherWay } from "@/lib/blocks"
 import { logActionError } from "@/lib/log-action-error"
-import { isHtmlContentEmpty, sanitizePostHtml } from "@/lib/sanitize-html"
+import {
+  getPostTextLength,
+  isHtmlContentEmpty,
+  MAX_POST_LENGTH,
+  sanitizePostHtml,
+} from "@/lib/sanitize-html"
 import {
   MAX_MEDIA_PER_POST,
   mediaUrlToPathname,
@@ -100,6 +105,9 @@ export async function createPost(
   }
   if (isHtmlContentEmpty(content) && media.length === 0) {
     return { success: false, error: "Post can't be empty." }
+  }
+  if (getPostTextLength(content) > MAX_POST_LENGTH) {
+    return { success: false, error: `Posts can't be longer than ${MAX_POST_LENGTH} characters.` }
   }
 
   let parentAuthorId: string | null = null

@@ -1,6 +1,13 @@
 "use client"
 
-import { useEffect, useRef, useState, useTransition, type ChangeEvent } from "react"
+import {
+  useEffect,
+  useRef,
+  useState,
+  useTransition,
+  type ChangeEvent,
+  type DragEvent,
+} from "react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
 import { ImageIcon, VideoIcon, XIcon } from "lucide-react"
@@ -14,6 +21,7 @@ import {
   RichTextToolbar,
   useRichTextEditor,
 } from "@/components/rich-text-editor"
+import { MAX_POST_LENGTH } from "@/lib/sanitize-html"
 import { cn, getInitials } from "@/lib/utils"
 import {
   MAX_MEDIA_PER_POST,
@@ -22,6 +30,78 @@ import {
   type MediaAttachment,
   type MediaType,
 } from "@/lib/media"
+
+/** Character count past which the counter switches from the quiet dot to a numeric countdown. */
+const LENGTH_WARNING_THRESHOLD = 20
+
+/**
+ * Twitter-style circular progress ring for the composer's character
+ * count. Purely decorative below the warning threshold (a small dot),
+ * then fills up and switches to a numeric countdown as the limit
+ * approaches, matching the pattern most people already know from
+ * other post composers.
+ */
+function CharacterRing({ length }: { length: number }) {
+  const remaining = MAX_POST_LENGTH - length
+  const isOverLimit = remaining < 0
+  const isNearLimit = remaining <= LENGTH_WARNING_THRESHOLD
+  const size = 22
+  const stroke = 2
+  const r = (size - stroke) / 2
+  const circumference = 2 * Math.PI * r
+  const progress = Math.min(length / MAX_POST_LENGTH, 1)
+  const dashoffset = circumference * (1 - progress)
+
+  return (
+    <div className="flex items-center gap-2" aria-live="polite">
+      {isNearLimit ? (
+        <span
+          className={cn(
+            "text-xs font-medium tabular-nums",
+            isOverLimit ? "text-destructive" : "text-amber-500",
+          )}
+        >
+          {remaining}
+        </span>
+      ) : null}
+      <svg
+        width={size}
+        height={size}
+        viewBox={`0 0 ${size} ${size}`}
+        className="-rotate-90 shrink-0"
+        role="img"
+        aria-label={
+          isOverLimit
+            ? `${Math.abs(remaining)} characters over the limit`
+            : `${remaining} characters remaining`
+        }
+      >
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          fill="none"
+          strokeWidth={stroke}
+          className="stroke-border"
+        />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          fill="none"
+          strokeWidth={stroke}
+          strokeDasharray={circumference}
+          strokeDashoffset={dashoffset}
+          strokeLinecap="round"
+          className={cn(
+            "transition-[stroke-dashoffset,stroke] duration-150",
+            isOverLimit ? "stroke-destructive" : isNearLimit ? "stroke-amber-500" : "stroke-primary",
+          )}
+        />
+      </svg>
+    </div>
+  )
+}
 
 type Attachment = {
   id: string
@@ -144,6 +224,7 @@ function useMediaAttachments() {
 export function PostComposer({
   user,
   replyToId,
+  replyToUsername,
   placeholder = "What's happening?",
   submitLabel = "Post",
   autoFocus = false,
@@ -152,6 +233,8 @@ export function PostComposer({
   user: { name: string; image?: string | null }
   /** When set, the created post is a reply to this post id. */
   replyToId?: string
+  /** Author of the post being replied to, shown as a "Replying to @…" context line. */
+  replyToUsername?: string | null
   placeholder?: string
   submitLabel?: string
   autoFocus?: boolean
@@ -164,7 +247,9 @@ export function PostComposer({
   const videoInputRef = useRef<HTMLInputElement>(null)
   const [isPending, startTransition] = useTransition()
   const [isEmpty, setIsEmpty] = useState(true)
+  const [length, setLength] = useState(0)
   const [isFocused, setIsFocused] = useState(autoFocus)
+  const [isDraggingOver, setIsDraggingOver] = useState(false)
   const {
     attachments,
     addFiles,
@@ -179,19 +264,26 @@ export function PostComposer({
   const editor = useRichTextEditor({
     placeholder,
     autofocus: autoFocus,
-    onUpdate: (editor) => setIsEmpty(editor.isEmpty),
+    onUpdate: (editor) => {
+      setIsEmpty(editor.isEmpty)
+      setLength(editor.state.doc.textContent.length)
+    },
   })
 
   useEffect(() => {
     if (!editor) return
     const onFocus = () => setIsFocused(true)
+    const onBlur = () => setIsFocused(!editor.isEmpty)
     editor.on("focus", onFocus)
+    editor.on("blur", onBlur)
     return () => {
       editor.off("focus", onFocus)
+      editor.off("blur", onBlur)
     }
   }, [editor])
 
-  const canSubmit = editor && (!isEmpty || attachments.length > 0)
+  const isOverLimit = length > MAX_POST_LENGTH
+  const canSubmit = editor && (!isEmpty || attachments.length > 0) && !isOverLimit
   const canAddMoreImages = !hasVideo && attachments.length < MAX_MEDIA_PER_POST
   const canAddVideo = !hasVideo && !hasImageOrGif
 
@@ -205,6 +297,18 @@ export function PostComposer({
     const files = Array.from(e.target.files ?? [])
     if (files.length) addFiles(files, "video")
     e.target.value = ""
+  }
+
+  /** Lets people drag image/video files straight onto the composer instead of only using the toolbar buttons. */
+  function handleDrop(e: DragEvent<HTMLFormElement>) {
+    e.preventDefault()
+    setIsDraggingOver(false)
+    const files = Array.from(e.dataTransfer.files)
+    if (!files.length) return
+    const videos = files.filter((f) => f.type.startsWith("video/"))
+    const images = files.filter((f) => !f.type.startsWith("video/"))
+    if (videos.length) addFiles(videos, "video")
+    if (images.length) addFiles(images, "image")
   }
 
   function handleSubmit() {
@@ -225,6 +329,7 @@ export function PostComposer({
       }
       editor.commands.clearContent(true)
       setIsEmpty(true)
+      setLength(0)
       resetAttachments()
       setIsFocused(autoFocus)
       onPosted?.()
@@ -239,7 +344,16 @@ export function PostComposer({
         e.preventDefault()
         handleSubmit()
       }}
-      className="flex gap-3 border-b border-border p-4"
+      onDragOver={(e) => {
+        e.preventDefault()
+        setIsDraggingOver(true)
+      }}
+      onDragLeave={() => setIsDraggingOver(false)}
+      onDrop={handleDrop}
+      className={cn(
+        "flex gap-3 border-b border-border p-4 transition-colors",
+        isDraggingOver && "bg-primary/5",
+      )}
     >
       <Avatar className="size-10 shrink-0">
         <AvatarImage src={user.image ?? undefined} alt={user.name} />
@@ -247,11 +361,25 @@ export function PostComposer({
       </Avatar>
 
       <div className="flex flex-1 flex-col gap-3">
+        {replyToUsername ? (
+          <p className="text-sm text-muted-foreground">
+            Replying to <span className="text-primary">@{replyToUsername}</span>
+          </p>
+        ) : null}
+
         <div
           className={cn(
             "rounded-2xl transition-colors",
             isFocused && "ring-1 ring-primary/30",
+            isDraggingOver && "outline-dashed outline-2 outline-primary/40",
           )}
+          onKeyDown={(e) => {
+            // Cmd/Ctrl+Enter submits, so people don't have to reach for the mouse.
+            if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+              e.preventDefault()
+              handleSubmit()
+            }
+          }}
         >
           <RichTextEditor
             editor={editor}
@@ -372,14 +500,20 @@ export function PostComposer({
             <RichTextToolbar editor={editor} />
           </div>
 
-          <Button
-            type="submit"
-            className="rounded-full"
-            disabled={!canSubmit || isPending || isUploading}
-          >
-            {isPending || isUploading ? <Spinner data-icon="inline-start" /> : null}
-            {submitLabel}
-          </Button>
+          <div className="flex items-center gap-3">
+            {length > 0 ? <CharacterRing length={length} /> : null}
+            {length > 0 ? (
+              <span className="h-5 w-px bg-border" aria-hidden="true" />
+            ) : null}
+            <Button
+              type="submit"
+              className="rounded-full"
+              disabled={!canSubmit || isPending || isUploading}
+            >
+              {isPending || isUploading ? <Spinner data-icon="inline-start" /> : null}
+              {submitLabel}
+            </Button>
+          </div>
         </div>
       </div>
     </form>
