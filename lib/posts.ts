@@ -193,6 +193,15 @@ export async function getNewPostsCount(
   return row?.value ?? 0
 }
 
+/** Total number of top-level posts (i.e. not replies) authored by a user, for profile stats. */
+export async function getUserPostCount(userId: string): Promise<number> {
+  const [row] = await db
+    .select({ value: count() })
+    .from(posts)
+    .where(and(eq(posts.userId, userId), eq(posts.isReply, false)))
+  return row?.value ?? 0
+}
+
 /** Top-level posts authored by a single user, newest first. */
 export async function getUserPosts(
   userId: string,
