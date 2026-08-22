@@ -21,7 +21,6 @@ import {
   RichTextToolbar,
   useRichTextEditor,
 } from "@/components/rich-text-editor"
-import { MAX_POST_LENGTH } from "@/lib/sanitize-html"
 import { cn, getInitials } from "@/lib/utils"
 import {
   MAX_MEDIA_PER_POST,
@@ -30,78 +29,6 @@ import {
   type MediaAttachment,
   type MediaType,
 } from "@/lib/media"
-
-/** Character count past which the counter switches from the quiet dot to a numeric countdown. */
-const LENGTH_WARNING_THRESHOLD = 20
-
-/**
- * Twitter-style circular progress ring for the composer's character
- * count. Purely decorative below the warning threshold (a small dot),
- * then fills up and switches to a numeric countdown as the limit
- * approaches, matching the pattern most people already know from
- * other post composers.
- */
-function CharacterRing({ length }: { length: number }) {
-  const remaining = MAX_POST_LENGTH - length
-  const isOverLimit = remaining < 0
-  const isNearLimit = remaining <= LENGTH_WARNING_THRESHOLD
-  const size = 22
-  const stroke = 2
-  const r = (size - stroke) / 2
-  const circumference = 2 * Math.PI * r
-  const progress = Math.min(length / MAX_POST_LENGTH, 1)
-  const dashoffset = circumference * (1 - progress)
-
-  return (
-    <div className="flex items-center gap-2" aria-live="polite">
-      {isNearLimit ? (
-        <span
-          className={cn(
-            "text-xs font-medium tabular-nums",
-            isOverLimit ? "text-destructive" : "text-amber-500",
-          )}
-        >
-          {remaining}
-        </span>
-      ) : null}
-      <svg
-        width={size}
-        height={size}
-        viewBox={`0 0 ${size} ${size}`}
-        className="-rotate-90 shrink-0"
-        role="img"
-        aria-label={
-          isOverLimit
-            ? `${Math.abs(remaining)} characters over the limit`
-            : `${remaining} characters remaining`
-        }
-      >
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={r}
-          fill="none"
-          strokeWidth={stroke}
-          className="stroke-border"
-        />
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={r}
-          fill="none"
-          strokeWidth={stroke}
-          strokeDasharray={circumference}
-          strokeDashoffset={dashoffset}
-          strokeLinecap="round"
-          className={cn(
-            "transition-[stroke-dashoffset,stroke] duration-150",
-            isOverLimit ? "stroke-destructive" : isNearLimit ? "stroke-amber-500" : "stroke-primary",
-          )}
-        />
-      </svg>
-    </div>
-  )
-}
 
 type Attachment = {
   id: string
@@ -247,9 +174,9 @@ export function PostComposer({
   const videoInputRef = useRef<HTMLInputElement>(null)
   const [isPending, startTransition] = useTransition()
   const [isEmpty, setIsEmpty] = useState(true)
-  const [length, setLength] = useState(0)
   const [isFocused, setIsFocused] = useState(autoFocus)
   const [isDraggingOver, setIsDraggingOver] = useState(false)
+  const [showFormatting, setShowFormatting] = useState(false)
   const {
     attachments,
     addFiles,
@@ -266,7 +193,6 @@ export function PostComposer({
     autofocus: autoFocus,
     onUpdate: (editor) => {
       setIsEmpty(editor.isEmpty)
-      setLength(editor.state.doc.textContent.length)
     },
   })
 
@@ -282,8 +208,7 @@ export function PostComposer({
     }
   }, [editor])
 
-  const isOverLimit = length > MAX_POST_LENGTH
-  const canSubmit = editor && (!isEmpty || attachments.length > 0) && !isOverLimit
+  const canSubmit = editor && (!isEmpty || attachments.length > 0)
   const canAddMoreImages = !hasVideo && attachments.length < MAX_MEDIA_PER_POST
   const canAddVideo = !hasVideo && !hasImageOrGif
 
@@ -329,7 +254,6 @@ export function PostComposer({
       }
       editor.commands.clearContent(true)
       setIsEmpty(true)
-      setLength(0)
       resetAttachments()
       setIsFocused(autoFocus)
       onPosted?.()
@@ -350,29 +274,33 @@ export function PostComposer({
       }}
       onDragLeave={() => setIsDraggingOver(false)}
       onDrop={handleDrop}
-      className={cn(
-        "flex gap-3 border-b border-border p-4 transition-colors",
-        isDraggingOver && "bg-primary/5",
-      )}
+      className="border-b border-border p-3 sm:p-4"
     >
-      <Avatar className="size-10 shrink-0">
-        <AvatarImage src={user.image ?? undefined} alt={user.name} />
-        <AvatarFallback>{getInitials(user.name)}</AvatarFallback>
-      </Avatar>
+      {/* Single elevated surface so the composer reads as one focused
+          object rather than a loose stack of controls. */}
+      <div
+        className={cn(
+          "relative flex flex-col gap-2 rounded-3xl border border-border bg-card/50 p-2 shadow-xs transition-all duration-200",
+          isFocused && "border-primary/40 bg-card shadow-sm ring-4 ring-primary/10",
+          isDraggingOver && "border-dashed border-primary bg-primary/5",
+        )}
+      >
+        {isDraggingOver ? (
+          <div className="pointer-events-none absolute inset-0 z-10 grid place-items-center rounded-3xl bg-primary/5">
+            <span className="rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground shadow-sm">
+              Drop to attach
+            </span>
+          </div>
+        ) : null}
 
-      <div className="flex flex-1 flex-col gap-3">
         {replyToUsername ? (
-          <p className="text-sm text-muted-foreground">
-            Replying to <span className="text-primary">@{replyToUsername}</span>
+          <p className="px-2 pt-1 text-sm text-muted-foreground">
+            Replying to <span className="font-medium text-primary">@{replyToUsername}</span>
           </p>
         ) : null}
 
         <div
-          className={cn(
-            "rounded-2xl transition-colors",
-            isFocused && "ring-1 ring-primary/30",
-            isDraggingOver && "outline-dashed outline-2 outline-primary/40",
-          )}
+          className="flex gap-3"
           onKeyDown={(e) => {
             // Cmd/Ctrl+Enter submits, so people don't have to reach for the mouse.
             if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
@@ -381,11 +309,18 @@ export function PostComposer({
             }
           }}
         >
+          <Avatar className="mt-1 size-10 shrink-0 ring-2 ring-background">
+            <AvatarImage src={user.image ?? undefined} alt={user.name} />
+            <AvatarFallback>{getInitials(user.name)}</AvatarFallback>
+          </Avatar>
+
           <RichTextEditor
             editor={editor}
             className={cn(
-              "cursor-text py-1 text-lg leading-relaxed",
-              replyToId ? "min-h-16" : "min-h-11",
+              // Generous inner padding gives the text room to breathe and
+              // makes the whole area feel like a real, clickable input.
+              "flex-1 cursor-text px-2 py-2.5 text-[17px] leading-relaxed",
+              replyToId ? "min-h-14" : "min-h-20",
             )}
           />
         </div>
@@ -450,8 +385,16 @@ export function PostComposer({
           </ul>
         ) : null}
 
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3">
-          <div className="flex items-center gap-1">
+        {/* Formatting lives on its own row behind a toggle so the action bar
+            stays a single uncluttered line, even on narrow screens. */}
+        {showFormatting ? (
+          <div className="rounded-2xl bg-muted/50 px-1.5 py-1">
+            <RichTextToolbar editor={editor} />
+          </div>
+        ) : null}
+
+        <div className="flex items-center justify-between gap-2 border-t border-border/60 px-1 pt-2">
+          <div className="flex min-w-0 items-center gap-0.5">
             <input
               ref={imageInputRef}
               type="file"
@@ -501,13 +444,14 @@ export function PostComposer({
           </div>
 
           <div className="flex items-center gap-3">
-            {length > 0 ? <CharacterRing length={length} /> : null}
-            {length > 0 ? (
-              <span className="h-5 w-px bg-border" aria-hidden="true" />
+            {canSubmit ? (
+              <kbd className="hidden rounded border border-border bg-muted px-1.5 py-0.5 font-sans text-[10px] font-medium text-muted-foreground sm:inline-block">
+                ⌘ + ↵
+              </kbd>
             ) : null}
             <Button
               type="submit"
-              className="rounded-full"
+              className="rounded-full px-5 font-semibold shadow-xs transition-transform active:scale-95"
               disabled={!canSubmit || isPending || isUploading}
             >
               {isPending || isUploading ? <Spinner data-icon="inline-start" /> : null}

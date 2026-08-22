@@ -55,15 +55,16 @@ export function isHtmlContentEmpty(html: string): boolean {
 }
 
 /**
- * Visible-character cap for a post's rich-text content, matching the
- * composer's counter and enforced again server-side in `createPost` —
- * the client check is only a UX shortcut. Counted on the plain-text
- * length (via `stripHtmlToText`), not the raw HTML, so formatting
- * markup never eats into the budget.
+ * Server-side abuse guard for a post's rich-text content. This is
+ * deliberately generous — the composer imposes no user-facing character
+ * limit — and exists only to stop a crafted request from storing an
+ * unbounded blob. Counted on the plain-text length (via
+ * `stripHtmlToText`), not the raw HTML, so formatting markup never eats
+ * into the budget.
  */
-export const MAX_POST_LENGTH = 280
+export const MAX_POST_LENGTH = 10000
 
-/** Plain-text length of sanitized rich-text content, for the composer's counter and server-side limit check. */
+/** Plain-text length of sanitized rich-text content, used for the server-side abuse guard. */
 export function getPostTextLength(html: string): number {
   return stripHtmlToText(html).length
 }
