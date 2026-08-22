@@ -14,20 +14,29 @@
  * producing confusing downstream errors later.
  */
 
-const REQUIRED_ENV_VARS = [
+/**
+ * NOTE: each variable is read with a STATIC `process.env.NAME` access.
+ * Bundlers (Turbopack/webpack) replace `process.env.NAME` at build
+ * time but cannot resolve a computed `process.env[key]` lookup, so
+ * iterating over a list of names and indexing into `process.env`
+ * reported every variable as missing even when it was set.
+ */
+const REQUIRED_ENV_VARS: Record<string, string | undefined> = {
   // Aurora IAM auth (lib/db/index.ts)
-  "AWS_ROLE_ARN",
-  "AWS_REGION",
-  "PGHOST",
+  AWS_ROLE_ARN: process.env.AWS_ROLE_ARN,
+  AWS_REGION: process.env.AWS_REGION,
+  PGHOST: process.env.PGHOST,
   // Better Auth session signing (lib/auth.ts)
-  "BETTER_AUTH_SECRET",
-] as const
+  BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET,
+}
 
 let validated = false
 
 export function assertRequiredEnv() {
   if (validated) return
-  const missing = REQUIRED_ENV_VARS.filter((key) => !process.env[key])
+  const missing = Object.entries(REQUIRED_ENV_VARS)
+    .filter(([, value]) => !value)
+    .map(([key]) => key)
   if (missing.length > 0) {
     throw new Error(
       `[v0] Missing required environment variable(s): ${missing.join(", ")}. ` +
