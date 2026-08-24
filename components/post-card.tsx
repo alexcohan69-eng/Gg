@@ -318,6 +318,7 @@ export function PostCard({
             variant="ghost"
             size="sm"
             aria-pressed={reposted}
+            aria-label={reposted ? "Undo repost" : "Repost"}
             className={cn(
               "gap-1.5 rounded-full hover:text-emerald-500",
               reposted && "text-emerald-500",
@@ -331,6 +332,7 @@ export function PostCard({
             variant="ghost"
             size="sm"
             aria-pressed={liked}
+            aria-label={liked ? "Unlike" : "Like"}
             className={cn(
               "gap-1.5 rounded-full hover:text-rose-500",
               liked && "text-rose-500",
