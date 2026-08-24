@@ -5,8 +5,11 @@ import {
   ArrowUpRightIcon,
   AtSignIcon,
   BadgeCheckIcon,
+  BriefcaseIcon,
   CalendarIcon,
+  FolderCheckIcon,
   GlobeIcon,
+  ListChecksIcon,
   MailIcon,
   MapPinIcon,
   MessageSquareTextIcon,
@@ -14,6 +17,7 @@ import {
   UsersIcon,
 } from "lucide-react"
 import { getSessionWithRetry } from "@/lib/auth"
+import { getCareerProfile, getWorkExperience } from "@/lib/career"
 import { getFollowCounts, getProfileByIdentifier, isFollowing } from "@/lib/follows"
 import { getUserPostCount } from "@/lib/posts"
 import { getInitials, profileHref } from "@/lib/utils"
@@ -22,6 +26,7 @@ import { BackButton } from "@/components/back-button"
 import { FollowButton } from "@/components/follow-button"
 import { MessageButton } from "@/components/message-button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 
 export async function generateMetadata({

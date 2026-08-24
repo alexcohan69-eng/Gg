@@ -89,6 +89,30 @@ const statements = [
     "updatedAt" timestamp default now()
   )`,
 
+  // Career overview fields on the About page (years of experience,
+  // client/project totals, skills, workflow). Added via ALTER TABLE
+  // rather than being in the CREATE TABLE above since "user" already
+  // existed in prior environments before this feature.
+  `alter table "user" add column if not exists "yearsExperience" integer`,
+  `alter table "user" add column if not exists "totalClients" integer`,
+  `alter table "user" add column if not exists "totalProjects" integer`,
+  `alter table "user" add column if not exists "skills" jsonb default '[]'`,
+  `alter table "user" add column if not exists "workflowSteps" jsonb default '[]'`,
+
+  `create table if not exists "workExperience" (
+    id text primary key,
+    "userId" text not null,
+    role text not null,
+    company text not null,
+    "startDate" text not null,
+    "endDate" text,
+    "isCurrent" boolean not null default false,
+    description text,
+    "sortOrder" integer not null default 0,
+    "createdAt" timestamp not null default now()
+  )`,
+  `create index if not exists workExperience_userId_sortOrder_idx on "workExperience" ("userId", "sortOrder")`,
+
   // App tables
   `create table if not exists "posts" (
     id text primary key,
