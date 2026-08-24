@@ -2,7 +2,7 @@ import type { Metadata } from "next"
 import { headers } from "next/headers"
 import { notFound, redirect } from "next/navigation"
 import { getSessionWithRetry } from "@/lib/auth"
-import { getUserPosts } from "@/lib/posts"
+import { getPortfolioProjects } from "@/lib/portfolio"
 import { getFollowCounts, getProfileByIdentifier, isFollowing } from "@/lib/follows"
 import { getBlockState } from "@/lib/blocks"
 import { profileHref } from "@/lib/utils"
@@ -10,8 +10,7 @@ import { ProfileStickyHeader } from "@/components/profile-sticky-header"
 import { BackButton } from "@/components/back-button"
 import { ProfileHeader } from "@/components/profile-header"
 import { ProfileTabs } from "@/components/profile-tabs"
-import { PostList } from "@/components/post-list"
-import { MessageSquareTextIcon } from "lucide-react"
+import { PortfolioGrid } from "@/components/portfolio-grid"
 
 export async function generateMetadata({
   params,
@@ -21,12 +20,12 @@ export async function generateMetadata({
   const { username } = await params
   const profile = await getProfileByIdentifier(username).catch(() => null)
 
-  if (!profile) return { title: "Profile" }
+  if (!profile) return { title: "Work" }
 
-  return { title: `${profile.name} (@${profile.username ?? "user"})` }
+  return { title: `${profile.name}'s work (@${profile.username ?? "user"})` }
 }
 
-export default async function PublicProfilePage({
+export default async function ProfileWorkPage({
   params,
 }: {
   params: Promise<{ username: string }>
@@ -39,11 +38,9 @@ export default async function PublicProfilePage({
   const profile = await getProfileByIdentifier(username)
   if (!profile) notFound()
 
-  // Canonicalize to the username-based URL so id-based links (used as a
-  // fallback for users without a username) don't create a duplicate,
-  // out-of-sync route for the same profile.
+  // Canonicalize to the username-based URL, same as the Posts/About pages.
   if (profile.username && profile.username !== username) {
-    redirect(profileHref(profile))
+    redirect(`${profileHref(profile)}/work`)
   }
 
   const isSelf = profile.id === session.user.id
@@ -53,8 +50,8 @@ export default async function PublicProfilePage({
     year: "numeric",
   })
 
-  const [posts, followCounts, viewerIsFollowing, blockState] = await Promise.all([
-    getUserPosts(profile.id, session.user.id),
+  const [projects, followCounts, viewerIsFollowing, blockState] = await Promise.all([
+    getPortfolioProjects(profile.id),
     getFollowCounts(profile.id),
     isSelf ? Promise.resolve(false) : isFollowing(session.user.id, profile.id),
     isSelf
@@ -90,17 +87,14 @@ export default async function PublicProfilePage({
         targetBlockedViewer={blockState.targetBlockedViewer}
       />
 
-      <ProfileTabs identifier={username} current="posts" />
+      <ProfileTabs identifier={username} current="work" />
 
-      <div className="border-t border-border">
-        <PostList
-          posts={posts}
-          currentUserId={session.user.id}
-          emptyIcon={MessageSquareTextIcon}
-          emptyTitle="No posts yet"
-          emptyDescription={`${profile.name} hasn't posted anything yet.`}
-        />
-      </div>
+      <PortfolioGrid
+        projects={projects}
+        profileIdentifier={username}
+        isSelf={isSelf}
+        name={profile.name}
+      />
     </div>
   )
 }

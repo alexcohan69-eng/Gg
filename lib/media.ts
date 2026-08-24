@@ -139,7 +139,10 @@ export function mediaUrlToPathname(url: string): string | null {
     const pathname = new URL(url, "http://localhost").searchParams.get(
       "pathname",
     )
-    return pathname && pathname.startsWith("posts/") ? pathname : null
+    return pathname &&
+      (pathname.startsWith("posts/") || pathname.startsWith("portfolio/"))
+      ? pathname
+      : null
   } catch {
     return null
   }

@@ -6,6 +6,7 @@ import { getUserPosts } from "@/lib/posts"
 import { getFollowCounts } from "@/lib/follows"
 import { ProfileStickyHeader } from "@/components/profile-sticky-header"
 import { ProfileHeader } from "@/components/profile-header"
+import { ProfileTabs } from "@/components/profile-tabs"
 import { PostList } from "@/components/post-list"
 import { MessageSquareTextIcon } from "lucide-react"
 
@@ -58,6 +59,8 @@ export default async function ProfilePage() {
         profileIdentifier={profileIdentifier}
         isSelf
       />
+
+      <ProfileTabs identifier={profileIdentifier} current="posts" />
 
       <div className="border-t border-border">
         <PostList
