@@ -195,6 +195,29 @@ export const workExperience = pgTable("workExperience", {
 })
 
 /**
+ * Contra-style portfolio case studies shown on the profile's Work tab.
+ * `sortOrder` (lower = earlier) lets the owner manually reorder
+ * projects, same pattern as `workExperience`. `tags` and `gallery` are
+ * JSON-encoded TEXT since Aurora DSQL has no array/JSON column types
+ * (see lib/portfolio.ts for the parse/stringify helpers).
+ */
+export const portfolioProjects = pgTable("portfolioProjects", {
+  id: text("id").primaryKey(),
+  userId: text("userId").notNull(),
+  title: text("title").notNull(),
+  tagline: text("tagline").notNull(),
+  coverImage: text("coverImage"),
+  client: text("client"),
+  externalUrl: text("externalUrl"),
+  tags: text("tags"),
+  description: text("description"),
+  gallery: text("gallery"),
+  sortOrder: integer("sortOrder").notNull().default(0),
+  createdAt: timestamp("createdAt").notNull().defaultNow(),
+  updatedAt: timestamp("updatedAt").notNull().defaultNow(),
+})
+
+/**
  * Moderation reports for the report-post / report-user MVP. `reason`
  * is a small closed set of strings (see lib/moderation.ts) rather than
  * its own enum table. `status` + `reviewedBy`/`reviewedAt` back the

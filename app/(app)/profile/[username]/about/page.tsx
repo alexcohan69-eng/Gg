@@ -16,6 +16,7 @@ import { getProfileByIdentifier, isFollowing } from "@/lib/follows"
 import { profileHref } from "@/lib/utils"
 import { PageHeader } from "@/components/page-header"
 import { BackButton } from "@/components/back-button"
+import { ProfileTabs } from "@/components/profile-tabs"
 import { ProfileAboutHero } from "@/components/profile-about-hero"
 import { ProfileAboutBio } from "@/components/profile-about-bio"
 import {
@@ -138,6 +139,8 @@ export default async function ProfileAboutPage({
         description="About this account"
         leading={<BackButton />}
       />
+
+      <ProfileTabs identifier={profile.username ?? profile.id} current="about" />
 
       <div className="flex flex-col gap-5 p-4">
         <ProfileAboutHero

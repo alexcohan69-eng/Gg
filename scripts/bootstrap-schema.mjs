@@ -228,6 +228,23 @@ const statements = [
   // other participant that this viewer hasn't read yet).
   `create index async if not exists messages_conversationId_isRead_idx on "messages" ("conversationId", "isRead")`,
 
+  `create table if not exists "portfolioProjects" (
+    id text primary key,
+    "userId" text not null,
+    title text not null,
+    tagline text not null,
+    "coverImage" text,
+    client text,
+    "externalUrl" text,
+    tags text,
+    description text,
+    gallery text,
+    "sortOrder" integer not null default 0,
+    "createdAt" timestamp not null default now(),
+    "updatedAt" timestamp not null default now()
+  )`,
+  `create index async if not exists portfolioProjects_userId_sortOrder_idx on "portfolioProjects" ("userId", "sortOrder")`,
+
   // Moderation MVP: blocks + reports
   `create table if not exists "blocks" (
     id text primary key,

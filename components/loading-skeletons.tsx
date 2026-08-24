@@ -132,6 +132,25 @@ export function MessageThreadSkeleton() {
   )
 }
 
+/** Placeholder matching `PortfolioGrid`'s card layout on the Work tab. */
+export function PortfolioGridSkeleton({ count = 6 }: { count?: number }) {
+  return (
+    <div
+      role="status"
+      aria-label="Loading projects"
+      className="grid grid-cols-2 gap-3 p-4 sm:grid-cols-3"
+    >
+      {Array.from({ length: count }).map((_, index) => (
+        <div key={index} className="flex flex-col gap-2">
+          <Skeleton className="aspect-[4/3] w-full rounded-xl" />
+          <Skeleton className="h-3.5 w-3/4" />
+          <Skeleton className="h-3.5 w-1/2" />
+        </div>
+      ))}
+    </div>
+  )
+}
+
 /** Placeholder for the notifications list, matching `NotificationItem`. */
 function NotificationRowSkeleton() {
   return (

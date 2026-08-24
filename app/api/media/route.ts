@@ -30,7 +30,11 @@ export async function GET(request: NextRequest) {
   const pathname = request.nextUrl.searchParams.get("pathname")
   if (
     !pathname ||
-    !(pathname.startsWith("posts/") || pathname.startsWith("profile/"))
+    !(
+      pathname.startsWith("posts/") ||
+      pathname.startsWith("profile/") ||
+      pathname.startsWith("portfolio/")
+    )
   ) {
     return NextResponse.json({ error: "Invalid pathname" }, { status: 400 })
   }
