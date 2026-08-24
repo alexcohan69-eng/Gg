@@ -10,7 +10,7 @@ import {
 } from "react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
-import { ImageIcon, VideoIcon, XIcon } from "lucide-react"
+import { ImageIcon, TypeIcon, VideoIcon, XIcon } from "lucide-react"
 import { toast } from "sonner"
 import { createPost } from "@/app/actions/posts"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -211,6 +211,13 @@ export function PostComposer({
   const canSubmit = editor && (!isEmpty || attachments.length > 0)
   const canAddMoreImages = !hasVideo && attachments.length < MAX_MEDIA_PER_POST
   const canAddVideo = !hasVideo && !hasImageOrGif
+  // The composer only needs its full surface (attachments grid, toolbar,
+  // Post button) once someone is actually composing. Otherwise it collapses
+  // to a slim, low-noise row so it doesn't compete with the feed below it.
+  // `showFormatting` is included so opening the formatting row can't blur
+  // the (still-empty) editor and collapse the whole composer out from
+  // under it.
+  const isExpanded = isFocused || !isEmpty || attachments.length > 0 || showFormatting
 
   function handleImagesSelected(e: ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? [])
@@ -277,11 +284,14 @@ export function PostComposer({
       className="border-b border-border p-3 sm:p-4"
     >
       {/* Single elevated surface so the composer reads as one focused
-          object rather than a loose stack of controls. */}
+          object rather than a loose stack of controls. Idle and empty, it
+          collapses to a slim row; it only grows into the full surface
+          (attachments, toolbar, Post button) once someone starts typing,
+          focuses it, or attaches media. */}
       <div
         className={cn(
           "relative flex flex-col gap-2 rounded-3xl border border-border bg-card/50 p-2 shadow-xs transition-all duration-200",
-          isFocused && "border-primary/40 bg-card shadow-sm ring-4 ring-primary/10",
+          isExpanded && "border-primary/40 bg-card shadow-sm ring-4 ring-primary/10",
           isDraggingOver && "border-dashed border-primary bg-primary/5",
         )}
       >
@@ -293,7 +303,7 @@ export function PostComposer({
           </div>
         ) : null}
 
-        {replyToUsername ? (
+        {replyToUsername && isExpanded ? (
           <p className="px-2 pt-1 text-sm text-muted-foreground">
             Replying to <span className="font-medium text-primary">@{replyToUsername}</span>
           </p>
@@ -308,8 +318,18 @@ export function PostComposer({
               handleSubmit()
             }
           }}
+          onClick={() => {
+            // While collapsed, the row (including the avatar) acts as one
+            // big target for opening the composer, not just the text itself.
+            if (!isExpanded) editor?.commands.focus()
+          }}
         >
-          <Avatar className="mt-1 size-10 shrink-0 ring-2 ring-background">
+          <Avatar
+            className={cn(
+              "shrink-0 ring-2 ring-background transition-all duration-200",
+              isExpanded ? "mt-1 size-10" : "size-9",
+            )}
+          >
             <AvatarImage src={user.image ?? undefined} alt={user.name} />
             <AvatarFallback>{getInitials(user.name)}</AvatarFallback>
           </Avatar>
@@ -319,13 +339,13 @@ export function PostComposer({
             className={cn(
               // Generous inner padding gives the text room to breathe and
               // makes the whole area feel like a real, clickable input.
-              "flex-1 cursor-text px-2 py-2.5 text-[17px] leading-relaxed",
-              replyToId ? "min-h-14" : "min-h-20",
+              "flex-1 cursor-text px-2 text-[17px] leading-relaxed transition-all duration-200",
+              isExpanded ? cn("py-2.5", replyToId ? "min-h-14" : "min-h-20") : "flex items-center py-2",
             )}
           />
         </div>
 
-        {attachments.length > 0 ? (
+        {isExpanded && attachments.length > 0 ? (
           <ul
             className={cn(
               "grid gap-2",
@@ -385,80 +405,97 @@ export function PostComposer({
           </ul>
         ) : null}
 
-        {/* Formatting lives on its own row behind a toggle so the action bar
-            stays a single uncluttered line, even on narrow screens. */}
-        {showFormatting ? (
+        {/* Formatting lives on its own row behind the "Aa" toggle so the
+            action bar below stays a single uncluttered line, even on
+            narrow screens — it never renders alongside the icon row. */}
+        {isExpanded && showFormatting ? (
           <div className="rounded-2xl bg-muted/50 px-1.5 py-1">
             <RichTextToolbar editor={editor} />
           </div>
         ) : null}
 
-        <div className="flex items-center justify-between gap-2 border-t border-border/60 px-1 pt-2">
-          <div className="flex min-w-0 items-center gap-0.5">
-            <input
-              ref={imageInputRef}
-              type="file"
-              accept="image/jpeg,image/png,image/webp,image/gif"
-              multiple
-              onChange={handleImagesSelected}
-              className="sr-only"
-              aria-hidden="true"
-              tabIndex={-1}
-            />
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              className="rounded-full text-primary hover:bg-primary/10"
-              aria-label="Add image or GIF"
-              onClick={() => imageInputRef.current?.click()}
-              disabled={isPending || !canAddMoreImages}
-            >
-              <ImageIcon />
-            </Button>
+        {isExpanded ? (
+          <div className="flex items-center justify-between gap-2 border-t border-border/60 px-1 pt-2">
+            <div className="flex min-w-0 items-center gap-0.5">
+              <input
+                ref={imageInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                multiple
+                onChange={handleImagesSelected}
+                className="sr-only"
+                aria-hidden="true"
+                tabIndex={-1}
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                className="rounded-full text-primary hover:bg-primary/10"
+                aria-label="Add image or GIF"
+                onClick={() => imageInputRef.current?.click()}
+                disabled={isPending || !canAddMoreImages}
+              >
+                <ImageIcon />
+              </Button>
 
-            <input
-              ref={videoInputRef}
-              type="file"
-              accept="video/mp4,video/webm,video/quicktime"
-              onChange={handleVideoSelected}
-              className="sr-only"
-              aria-hidden="true"
-              tabIndex={-1}
-            />
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              className="rounded-full text-primary hover:bg-primary/10"
-              aria-label="Add video"
-              onClick={() => videoInputRef.current?.click()}
-              disabled={isPending || !canAddVideo}
-            >
-              <VideoIcon />
-            </Button>
+              <input
+                ref={videoInputRef}
+                type="file"
+                accept="video/mp4,video/webm,video/quicktime"
+                onChange={handleVideoSelected}
+                className="sr-only"
+                aria-hidden="true"
+                tabIndex={-1}
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                className="rounded-full text-primary hover:bg-primary/10"
+                aria-label="Add video"
+                onClick={() => videoInputRef.current?.click()}
+                disabled={isPending || !canAddVideo}
+              >
+                <VideoIcon />
+              </Button>
 
-            <span className="mx-1 h-5 w-px bg-border" aria-hidden="true" />
+              <span className="mx-1 h-5 w-px bg-border" aria-hidden="true" />
 
-            <RichTextToolbar editor={editor} />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                aria-pressed={showFormatting}
+                className={cn(
+                  "rounded-full text-primary hover:bg-primary/10",
+                  showFormatting && "bg-primary/15",
+                )}
+                aria-label={showFormatting ? "Hide formatting options" : "Show formatting options"}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => setShowFormatting((v) => !v)}
+              >
+                <TypeIcon />
+              </Button>
+            </div>
+
+            <div className="flex items-center gap-3">
+              {canSubmit ? (
+                <kbd className="hidden rounded border border-border bg-muted px-1.5 py-0.5 font-sans text-[10px] font-medium text-muted-foreground sm:inline-block">
+                  ⌘ + ↵
+                </kbd>
+              ) : null}
+              <Button
+                type="submit"
+                className="rounded-full px-5 font-semibold shadow-xs transition-transform active:scale-95"
+                disabled={!canSubmit || isPending || isUploading}
+              >
+                {isPending || isUploading ? <Spinner data-icon="inline-start" /> : null}
+                {submitLabel}
+              </Button>
+            </div>
           </div>
-
-          <div className="flex items-center gap-3">
-            {canSubmit ? (
-              <kbd className="hidden rounded border border-border bg-muted px-1.5 py-0.5 font-sans text-[10px] font-medium text-muted-foreground sm:inline-block">
-                ⌘ + ↵
-              </kbd>
-            ) : null}
-            <Button
-              type="submit"
-              className="rounded-full px-5 font-semibold shadow-xs transition-transform active:scale-95"
-              disabled={!canSubmit || isPending || isUploading}
-            >
-              {isPending || isUploading ? <Spinner data-icon="inline-start" /> : null}
-              {submitLabel}
-            </Button>
-          </div>
-        </div>
+        ) : null}
       </div>
     </form>
   )
