@@ -9,12 +9,14 @@ import {
   ImageIcon,
   MoreHorizontalIcon,
   PencilIcon,
+  PlayIcon,
   Trash2Icon,
 } from "lucide-react"
 import { deletePortfolioProject } from "@/app/actions/portfolio"
 import { sanitizePostHtml } from "@/lib/sanitize-html"
 import type { PortfolioProject } from "@/lib/portfolio"
 import { PortfolioProjectDialog } from "@/components/portfolio-project-editor"
+import { MediaLightbox } from "@/components/media-lightbox"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -48,6 +50,7 @@ export function PortfolioProjectDetail({
   const router = useRouter()
   const [editOpen, setEditOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
   const [isPending, startTransition] = useTransition()
 
   function handleChanged() {
@@ -73,24 +76,60 @@ export function PortfolioProjectDetail({
 
   const hasMeta = project.client || project.externalUrl || project.tags.length > 0
 
+  // The cover doubles as the first lightbox item, followed by the
+  // gallery, so opening the banner and paging through the gallery
+  // browse the same continuous set of media.
+  const lightboxItems = project.coverImage
+    ? [{ url: project.coverImage, type: project.coverImageType }, ...project.gallery]
+    : project.gallery
+
   return (
     <div className="flex flex-col">
-      <div className="relative aspect-video w-full bg-muted">
+      <button
+        type="button"
+        onClick={() => project.coverImage && setLightboxIndex(0)}
+        disabled={!project.coverImage}
+        aria-label={project.coverImage ? `View cover media for ${project.title}` : undefined}
+        className="group relative aspect-video w-full bg-muted disabled:cursor-default"
+      >
         {project.coverImage ? (
-          <Image
-            src={project.coverImage}
-            alt={`Cover image for ${project.title}`}
-            fill
-            unoptimized
-            priority
-            className="object-cover"
-          />
+          project.coverImageType === "video" ? (
+            <>
+              <video
+                src={project.coverImage}
+                muted
+                playsInline
+                preload="metadata"
+                className="size-full object-cover"
+                aria-hidden="true"
+              />
+              <div className="absolute inset-0 flex items-center justify-center bg-black/10 transition-colors group-hover:bg-black/20">
+                <span className="flex size-12 items-center justify-center rounded-full bg-background/90 text-foreground shadow-sm">
+                  <PlayIcon className="size-5 fill-current" aria-hidden="true" />
+                </span>
+              </div>
+            </>
+          ) : (
+            <Image
+              src={project.coverImage}
+              alt={`Cover ${project.coverImageType === "gif" ? "GIF" : "image"} for ${project.title}`}
+              fill
+              unoptimized
+              priority
+              className="object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+            />
+          )
         ) : (
           <div className="flex h-full w-full items-center justify-center">
             <ImageIcon className="size-10 text-muted-foreground" aria-hidden="true" />
           </div>
         )}
-      </div>
+        {project.coverImageType === "gif" ? (
+          <span className="absolute bottom-2 left-2 rounded bg-background/80 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-foreground backdrop-blur-sm">
+            GIF
+          </span>
+        ) : null}
+      </button>
 
       <div className="flex flex-col gap-6 p-4 pb-10">
         <div className="flex items-start justify-between gap-4">
@@ -180,24 +219,63 @@ export function PortfolioProjectDetail({
               Gallery
             </h2>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-              {project.gallery.map((url, index) => (
-                <div
-                  key={url}
-                  className="relative aspect-square overflow-hidden rounded-xl border border-border bg-muted"
-                >
-                  <Image
-                    src={url}
-                    alt={`Gallery image ${index + 1} for ${project.title}`}
-                    fill
-                    unoptimized
-                    className="object-cover transition-transform duration-300 hover:scale-105"
-                  />
-                </div>
-              ))}
+              {project.gallery.map((item, index) => {
+                // Cover (if any) occupies lightbox index 0, so gallery
+                // items are offset by one in the shared item list.
+                const lightboxItemIndex = project.coverImage ? index + 1 : index
+                return (
+                  <button
+                    key={item.url}
+                    type="button"
+                    onClick={() => setLightboxIndex(lightboxItemIndex)}
+                    aria-label={`View ${item.type === "video" ? "video" : item.type === "gif" ? "GIF" : "image"} ${index + 1} for ${project.title}`}
+                    className="group relative aspect-square overflow-hidden rounded-xl border border-border bg-muted"
+                  >
+                    {item.type === "video" ? (
+                      <>
+                        <video
+                          src={item.url}
+                          muted
+                          playsInline
+                          preload="metadata"
+                          className="size-full object-cover"
+                          aria-hidden="true"
+                        />
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/10 transition-colors group-hover:bg-black/20">
+                          <span className="flex size-8 items-center justify-center rounded-full bg-background/90 text-foreground shadow-sm">
+                            <PlayIcon className="size-3.5 fill-current" aria-hidden="true" />
+                          </span>
+                        </div>
+                      </>
+                    ) : (
+                      <Image
+                        src={item.url}
+                        alt={`Gallery ${item.type === "gif" ? "GIF" : "image"} ${index + 1} for ${project.title}`}
+                        fill
+                        unoptimized
+                        className="object-cover transition-transform duration-300 group-hover:scale-105"
+                      />
+                    )}
+                    {item.type === "gif" ? (
+                      <span className="absolute bottom-1.5 left-1.5 rounded bg-background/80 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-foreground backdrop-blur-sm">
+                        GIF
+                      </span>
+                    ) : null}
+                  </button>
+                )
+              })}
             </div>
           </div>
         ) : null}
       </div>
+
+      <MediaLightbox
+        items={lightboxItems}
+        index={lightboxIndex}
+        onIndexChange={setLightboxIndex}
+        onClose={() => setLightboxIndex(null)}
+        altPrefix={project.title}
+      />
 
       {isSelf ? (
         <>

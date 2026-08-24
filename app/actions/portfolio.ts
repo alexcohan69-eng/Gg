@@ -7,7 +7,12 @@ import { and, eq } from "drizzle-orm"
 import { getSessionWithRetry } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { portfolioProjects } from "@/lib/db/schema"
-import { mediaUrlToPathname } from "@/lib/media"
+import {
+  mediaUrlToPathname,
+  validateGalleryMedia,
+  type MediaAttachment,
+  type MediaType,
+} from "@/lib/media"
 import { sanitizePostHtml, stripHtmlToText } from "@/lib/sanitize-html"
 import { logActionError } from "@/lib/log-action-error"
 
@@ -37,8 +42,21 @@ const MAX_CLIENT = 80
 const MAX_DESCRIPTION_TEXT = 4000
 const MAX_TAGS = 6
 const MAX_TAG_LENGTH = 30
-const MAX_GALLERY_IMAGES = 6
 const MAX_PROJECTS = 30
+
+const MEDIA_TYPES: MediaType[] = ["image", "gif", "video"]
+function isMediaType(value: unknown): value is MediaType {
+  return typeof value === "string" && (MEDIA_TYPES as string[]).includes(value)
+}
+
+/** Parses a client-submitted `{ url, type }` gallery/cover value, dropping anything malformed. */
+function parseMediaAttachment(value: unknown): MediaAttachment | null {
+  if (!value || typeof value !== "object") return null
+  const url = "url" in value ? String((value as { url: unknown }).url ?? "").trim() : ""
+  const type = "type" in value ? (value as { type: unknown }).type : "image"
+  if (!url) return null
+  return { url, type: isMediaType(type) ? type : "image" }
+}
 
 async function assertOwnsProject(userId: string, id: string) {
   const rows = await db
@@ -67,7 +85,8 @@ function parseProjectForm(formData: FormData):
       tags: string[]
       description: string | null
       coverImage: string | null
-      gallery: string[]
+      coverImageType: MediaType | null
+      gallery: MediaAttachment[]
     }
   | { error: string } {
   const title = String(formData.get("title") ?? "").trim()
@@ -76,6 +95,12 @@ function parseProjectForm(formData: FormData):
   const externalUrlRaw = String(formData.get("externalUrl") ?? "").trim()
   const externalUrl = externalUrlRaw || null
   const coverImage = String(formData.get("coverImage") ?? "").trim() || null
+  const coverImageTypeRaw = formData.get("coverImageType")
+  const coverImageType = coverImage
+    ? isMediaType(coverImageTypeRaw)
+      ? coverImageTypeRaw
+      : "image"
+    : null
   const descriptionHtml = String(formData.get("description") ?? "")
 
   let tags: string[] = []
@@ -89,12 +114,14 @@ function parseProjectForm(formData: FormData):
     return { error: "Invalid tags." }
   }
 
-  let gallery: string[] = []
+  let gallery: MediaAttachment[] = []
   const galleryRaw = String(formData.get("gallery") ?? "[]")
   try {
     const parsed = JSON.parse(galleryRaw)
     if (Array.isArray(parsed)) {
-      gallery = parsed.map((url) => String(url).trim()).filter(Boolean)
+      gallery = parsed
+        .map((item) => parseMediaAttachment(item))
+        .filter((item): item is MediaAttachment => item !== null)
     }
   } catch {
     return { error: "Invalid gallery." }
@@ -115,8 +142,9 @@ function parseProjectForm(formData: FormData):
   if (tags.length > MAX_TAGS || tags.some((tag) => tag.length > MAX_TAG_LENGTH)) {
     return { error: `You can add up to ${MAX_TAGS} tags of ${MAX_TAG_LENGTH} characters or fewer.` }
   }
-  if (gallery.length > MAX_GALLERY_IMAGES) {
-    return { error: `You can add up to ${MAX_GALLERY_IMAGES} gallery images.` }
+  const galleryError = validateGalleryMedia(gallery)
+  if (galleryError) {
+    return { error: galleryError }
   }
 
   const sanitizedDescription = descriptionHtml ? sanitizePostHtml(descriptionHtml) : ""
@@ -132,6 +160,7 @@ function parseProjectForm(formData: FormData):
     tags: [...new Set(tags)],
     description: sanitizedDescription || null,
     coverImage,
+    coverImageType,
     gallery,
   }
 }
@@ -160,6 +189,7 @@ export async function addPortfolioProject(formData: FormData): Promise<ActionRes
     client: parsed.client,
     externalUrl: parsed.externalUrl,
     coverImage: parsed.coverImage,
+    coverImageType: parsed.coverImageType,
     description: parsed.description,
     tags: JSON.stringify(parsed.tags),
     gallery: JSON.stringify(parsed.gallery),
@@ -196,6 +226,7 @@ export async function updatePortfolioProject(
       client: parsed.client,
       externalUrl: parsed.externalUrl,
       coverImage: parsed.coverImage,
+      coverImageType: parsed.coverImageType,
       description: parsed.description,
       tags: JSON.stringify(parsed.tags),
       gallery: JSON.stringify(parsed.gallery),
@@ -203,16 +234,22 @@ export async function updatePortfolioProject(
     })
     .where(and(eq(portfolioProjects.id, id), eq(portfolioProjects.userId, userId)))
 
-  // Best-effort cleanup of any images that were removed from the
+  // Best-effort cleanup of any media that was removed from the
   // project (replaced cover, deleted gallery items). A failure here
-  // shouldn't fail the update — the row is already saved.
+  // shouldn't fail the update — the row is already saved. Gallery
+  // rows may still be a legacy plain string[] of URLs, hence the
+  // per-item normalization below.
   const previous = existingRows[0]
   if (previous) {
-    const previousUrls = [
-      previous.coverImage,
-      ...JSON.parse(previous.gallery || "[]"),
-    ].filter((url): url is string => typeof url === "string" && url.length > 0)
-    const nextUrls = new Set([parsed.coverImage, ...parsed.gallery].filter(Boolean))
+    const previousGallery = (JSON.parse(previous.gallery || "[]") as unknown[]).map((item) =>
+      typeof item === "string" ? item : (item as { url?: string })?.url,
+    )
+    const previousUrls = [previous.coverImage, ...previousGallery].filter(
+      (url): url is string => typeof url === "string" && url.length > 0,
+    )
+    const nextUrls = new Set(
+      [parsed.coverImage, ...parsed.gallery.map((item) => item.url)].filter(Boolean),
+    )
     const removedPathnames = previousUrls
       .filter((url) => !nextUrls.has(url))
       .map((url) => mediaUrlToPathname(url))
@@ -251,7 +288,11 @@ export async function deletePortfolioProject(id: string): Promise<ActionResult> 
   // here shouldn't fail the delete — the row is already gone.
   const row = rows[0]
   if (row) {
-    const urls = [row.coverImage, ...JSON.parse(row.gallery || "[]")].filter(
+    // Gallery rows may still be a legacy plain string[] of URLs.
+    const gallery = (JSON.parse(row.gallery || "[]") as unknown[]).map((item) =>
+      typeof item === "string" ? item : (item as { url?: string })?.url,
+    )
+    const urls = [row.coverImage, ...gallery].filter(
       (url): url is string => typeof url === "string" && url.length > 0,
     )
     const pathnames = urls

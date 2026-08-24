@@ -27,9 +27,16 @@ const ALLOWED_TAGS = [
   "blockquote",
   "code",
   "pre",
+  // Inline images the portfolio case-study editor can insert into the
+  // description body (see components/rich-text-editor.tsx's optional
+  // Tiptap Image extension). Harmless to allow globally — an <img> tag
+  // can't execute script, and `src` is restricted to http(s)/relative
+  // URLs below, same as `href` on links.
+  "img",
 ]
 
 const ALLOWED_ATTR = ["href", "target", "rel"]
+const ALLOWED_IMG_ATTR = ["src", "alt"]
 
 /**
  * Sanitizes rich-text HTML produced by the post composer. Used both
@@ -42,7 +49,13 @@ export function sanitizePostHtml(html: string): string {
     allowedTags: ALLOWED_TAGS,
     allowedAttributes: {
       a: ALLOWED_ATTR,
+      img: ALLOWED_IMG_ATTR,
     },
+    // `src` on an <img> is restricted the same way `href` on links
+    // would be — only http(s) or scheme-relative (e.g. our own
+    // /api/media proxy URLs) are allowed, never javascript:/data:.
+    allowedSchemesByTag: { img: ["http", "https"] },
+    allowProtocolRelative: true,
     // Force safe defaults on links regardless of what the client sent.
     transformTags: {
       a: sanitizeHtml.simpleTransform("a", {

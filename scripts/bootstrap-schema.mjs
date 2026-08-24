@@ -234,6 +234,7 @@ const statements = [
     title text not null,
     tagline text not null,
     "coverImage" text,
+    "coverImageType" text,
     client text,
     "externalUrl" text,
     tags text,
@@ -244,6 +245,9 @@ const statements = [
     "updatedAt" timestamp not null default now()
   )`,
   `create index async if not exists portfolioProjects_userId_sortOrder_idx on "portfolioProjects" ("userId", "sortOrder")`,
+  // Added after the table already existed in prior environments —
+  // "image" | "gif" | "video" for the cover, mirroring gallery items.
+  `alter table "portfolioProjects" add column if not exists "coverImageType" text`,
 
   // Moderation MVP: blocks + reports
   `create table if not exists "blocks" (

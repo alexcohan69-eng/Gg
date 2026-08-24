@@ -4,8 +4,10 @@ import { useEffect, useState } from "react"
 import { EditorContent, useEditor, type Editor } from "@tiptap/react"
 import StarterKit from "@tiptap/starter-kit"
 import Placeholder from "@tiptap/extension-placeholder"
+import TiptapImage from "@tiptap/extension-image"
 import {
   BoldIcon,
+  ImagePlusIcon,
   ItalicIcon,
   LinkIcon,
   ListIcon,
@@ -15,6 +17,7 @@ import {
   StrikethroughIcon,
 } from "lucide-react"
 import { Toggle } from "@/components/ui/toggle"
+import { Spinner } from "@/components/ui/spinner"
 import { cn } from "@/lib/utils"
 
 function ToolbarButton({
@@ -55,9 +58,22 @@ function ToolbarButton({
 export function RichTextToolbar({
   editor,
   className,
+  onInsertImage,
+  insertingImage = false,
 }: {
   editor: Editor | null
   className?: string
+  /**
+   * When provided, renders an "Insert image" button that calls this
+   * instead of a formatting command — the caller owns the actual file
+   * picker/upload (e.g. the portfolio editor's inline description
+   * images) and inserts the result with `editor.chain().focus().setImage(...)`.
+   * Omitted entirely by callers (like the post composer) that don't
+   * support inline images.
+   */
+  onInsertImage?: () => void
+  /** Shows a spinner on the insert-image button while an upload is in flight. */
+  insertingImage?: boolean
 }) {
   // `editor.isActive(...)` below is imperative — Tiptap doesn't re-render
   // React on its own, so without this the toolbar only ever reflects
@@ -129,6 +145,15 @@ export function RichTextToolbar({
       <ToolbarButton label="Link" active={editor.isActive("link")} onClick={toggleLink}>
         <LinkIcon />
       </ToolbarButton>
+      {onInsertImage ? (
+        <ToolbarButton
+          label="Insert image"
+          disabled={insertingImage}
+          onClick={onInsertImage}
+        >
+          {insertingImage ? <Spinner className="size-4" /> : <ImagePlusIcon />}
+        </ToolbarButton>
+      ) : null}
       <span className="mx-0.5 h-4 w-px bg-border" aria-hidden="true" />
       <ToolbarButton
         label="Bulleted list"
@@ -166,10 +191,18 @@ export function useRichTextEditor({
   placeholder,
   autofocus = false,
   onUpdate,
+  images = false,
 }: {
   placeholder?: string
   autofocus?: boolean
   onUpdate?: (editor: Editor) => void
+  /**
+   * Enables Tiptap's Image node so `editor.chain().focus().setImage(...)`
+   * can insert an inline image anywhere in the description — used by
+   * the portfolio case-study editor, off by default for callers (like
+   * the post composer) that don't support inline images.
+   */
+  images?: boolean
 }) {
   const editor = useEditor({
     immediatelyRender: false,
@@ -187,6 +220,13 @@ export function useRichTextEditor({
         },
       }),
       Placeholder.configure({ placeholder: placeholder ?? "" }),
+      ...(images
+        ? [
+            TiptapImage.configure({
+              HTMLAttributes: { class: "max-w-full rounded-lg" },
+            }),
+          ]
+        : []),
     ],
     editorProps: {
       attributes: {

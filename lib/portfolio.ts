@@ -1,6 +1,7 @@
 import { and, asc, eq } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { portfolioProjects } from "@/lib/db/schema"
+import type { MediaAttachment, MediaType } from "@/lib/media"
 
 export type PortfolioProject = {
   id: string
@@ -8,21 +9,22 @@ export type PortfolioProject = {
   title: string
   tagline: string
   coverImage: string | null
+  coverImageType: MediaType
   client: string | null
   externalUrl: string | null
   tags: string[]
   description: string | null
-  gallery: string[]
+  gallery: MediaAttachment[]
   sortOrder: number
   createdAt: Date
   updatedAt: Date
 }
 
 /**
- * `tags` and `gallery` are stored as JSON-encoded TEXT (Aurora DSQL has
- * no JSON/JSONB or array column types) — parse defensively so a null,
- * missing, or malformed value falls back to an empty list instead of
- * throwing. Mirrors the pattern in lib/career.ts.
+ * `tags` is stored as JSON-encoded TEXT (Aurora DSQL has no JSON/JSONB
+ * or array column types) — parse defensively so a null, missing, or
+ * malformed value falls back to an empty list instead of throwing.
+ * Mirrors the pattern in lib/career.ts.
  */
 function parseJsonArray<T>(value: string | null): T[] {
   if (!value) return []
@@ -34,12 +36,33 @@ function parseJsonArray<T>(value: string | null): T[] {
   }
 }
 
+/**
+ * Gallery is stored as JSON-encoded TEXT array of `{ url, type }`
+ * MediaAttachment objects. Rows created before video/GIF galleries
+ * existed stored a plain string[] of URLs instead — each of those is
+ * upgraded to `{ url, type: "image" }` on read so older projects keep
+ * rendering correctly.
+ */
+function parseGallery(value: string | null): MediaAttachment[] {
+  const parsed = parseJsonArray<MediaAttachment | string>(value)
+  return parsed
+    .map((item) =>
+      typeof item === "string"
+        ? { url: item, type: "image" as MediaType }
+        : item && typeof item.url === "string"
+          ? { url: item.url, type: item.type ?? "image" }
+          : null,
+    )
+    .filter((item): item is MediaAttachment => item !== null)
+}
+
 function toPortfolioProject(row: {
   id: string
   userId: string
   title: string
   tagline: string
   coverImage: string | null
+  coverImageType: string | null
   client: string | null
   externalUrl: string | null
   tags: string | null
@@ -51,8 +74,9 @@ function toPortfolioProject(row: {
 }): PortfolioProject {
   return {
     ...row,
+    coverImageType: (row.coverImageType as MediaType | null) ?? "image",
     tags: parseJsonArray<string>(row.tags),
-    gallery: parseJsonArray<string>(row.gallery),
+    gallery: parseGallery(row.gallery),
   }
 }
 
