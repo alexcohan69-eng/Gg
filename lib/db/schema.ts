@@ -1,12 +1,4 @@
-import {
-  pgTable,
-  text,
-  boolean,
-  timestamp,
-  integer,
-  jsonb,
-} from "drizzle-orm/pg-core"
-import type { MediaAttachment } from "@/lib/media"
+import { pgTable, text, boolean, timestamp, integer } from "drizzle-orm/pg-core"
 
 /**
  * Better Auth core tables. Column names are camelCase to match Better
@@ -24,13 +16,22 @@ export const user = pgTable("user", {
   bannerImage: text("bannerImage"),
   website: text("website"),
   location: text("location"),
+  // Long-form rich-text "About" section shown on the About page.
+  // Separate from `bio` (the short one-line intro used in the header
+  // and card previews) — this is sanitized HTML from the same
+  // rich-text editor used by the post composer.
+  about: text("about"),
   // Career overview fields shown on the About page. All optional —
   // profiles that haven't filled these in fall back to empty states.
   yearsExperience: integer("yearsExperience"),
   totalClients: integer("totalClients"),
   totalProjects: integer("totalProjects"),
-  skills: jsonb("skills").$type<string[]>().default([]),
-  workflowSteps: jsonb("workflowSteps").$type<WorkflowStep[]>().default([]),
+  // Aurora DSQL doesn't support JSON/JSONB or array column types, so
+  // these are stored as JSON-encoded TEXT and parsed/stringified in
+  // application code (see lib/career.ts and app/actions/career.ts)
+  // instead of relying on the driver's jsonb (de)serialization.
+  skills: text("skills"),
+  workflowSteps: text("workflowSteps"),
   createdAt: timestamp("createdAt").notNull().defaultNow(),
   updatedAt: timestamp("updatedAt").notNull().defaultNow(),
 })
@@ -48,9 +49,10 @@ export const session = pgTable("session", {
   updatedAt: timestamp("updatedAt").notNull().defaultNow(),
   ipAddress: text("ipAddress"),
   userAgent: text("userAgent"),
-  userId: text("userId")
-    .notNull()
-    .references(() => user.id, { onDelete: "cascade" }),
+  // Plain text column, no FK — Aurora DSQL doesn't support foreign key
+  // constraints. Referential integrity (and cascade delete) is handled
+  // in application code instead.
+  userId: text("userId").notNull(),
 })
 
 export const account = pgTable("account", {
@@ -61,9 +63,10 @@ export const account = pgTable("account", {
   // accountId (see account_issuer_accountId_uidx) that identifies a
   // credential/provider account.
   issuer: text("issuer").notNull(),
-  userId: text("userId")
-    .notNull()
-    .references(() => user.id, { onDelete: "cascade" }),
+  // Plain text column, no FK — Aurora DSQL doesn't support foreign key
+  // constraints. Referential integrity (and cascade delete) is handled
+  // in application code instead.
+  userId: text("userId").notNull(),
   accessToken: text("accessToken"),
   refreshToken: text("refreshToken"),
   idToken: text("idToken"),
@@ -94,7 +97,10 @@ export const posts = pgTable("posts", {
   id: text("id").primaryKey(),
   userId: text("userId").notNull(),
   content: text("content").notNull(),
-  media: jsonb("media").$type<MediaAttachment[]>().default([]),
+  // JSON-encoded TEXT, not jsonb — Aurora DSQL has no JSON/JSONB
+  // column type. Parsed/stringified in application code (see
+  // lib/posts.ts and app/actions/posts.ts).
+  media: text("media"),
   replyToId: text("replyToId"),
   repostOfId: text("repostOfId"),
   quoteOfId: text("quoteOfId"),

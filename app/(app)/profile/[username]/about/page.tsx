@@ -12,14 +12,12 @@ import {
   ListChecksIcon,
   MailIcon,
   MapPinIcon,
-  MessageSquareTextIcon,
-  SparklesIcon,
   UsersIcon,
 } from "lucide-react"
 import { getSessionWithRetry } from "@/lib/auth"
 import { getCareerProfile, getWorkExperience } from "@/lib/career"
-import { getFollowCounts, getProfileByIdentifier, isFollowing } from "@/lib/follows"
-import { getUserPostCount } from "@/lib/posts"
+import { getProfileByIdentifier, isFollowing } from "@/lib/follows"
+import { sanitizePostHtml } from "@/lib/sanitize-html"
 import { getInitials, profileHref } from "@/lib/utils"
 import { PageHeader } from "@/components/page-header"
 import { BackButton } from "@/components/back-button"
@@ -48,17 +46,6 @@ function formatMonthYear(date: Date) {
   })
 }
 
-/** Human tenure on the platform, e.g. "2 years", "5 months", "New here". */
-function formatTenure(date: Date) {
-  const months = Math.floor(
-    (Date.now() - new Date(date).getTime()) / (1000 * 60 * 60 * 24 * 30.44),
-  )
-  if (months < 1) return "New here"
-  if (months < 12) return `${months} mo${months === 1 ? "" : "s"}`
-  const years = Math.floor(months / 12)
-  return `${years} yr${years === 1 ? "" : "s"}`
-}
-
 export default async function ProfileAboutPage({
   params,
 }: {
@@ -78,14 +65,11 @@ export default async function ProfileAboutPage({
 
   const isSelf = profile.id === session.user.id
 
-  const [postCount, followCounts, viewerFollows, careerProfile, workExperience] =
-    await Promise.all([
-      getUserPostCount(profile.id),
-      getFollowCounts(profile.id),
-      isSelf ? Promise.resolve(false) : isFollowing(session.user.id, profile.id),
-      getCareerProfile(profile.id),
-      getWorkExperience(profile.id),
-    ])
+  const [viewerFollows, careerProfile, workExperience] = await Promise.all([
+    isSelf ? Promise.resolve(false) : isFollowing(session.user.id, profile.id),
+    getCareerProfile(profile.id),
+    getWorkExperience(profile.id),
+  ])
 
   const careerHighlights: { label: string; value: string; icon: typeof BriefcaseIcon }[] = []
   if (careerProfile.yearsExperience != null) {
@@ -117,13 +101,6 @@ export default async function ProfileAboutPage({
   })
   const memberSince = formatMonthYear(profile.createdAt)
   const websiteLabel = profile.website?.replace(/^https?:\/\//, "").replace(/\/$/, "")
-
-  const stats = [
-    { label: "Posts", value: postCount.toLocaleString(), icon: MessageSquareTextIcon },
-    { label: "Followers", value: followCounts.followers.toLocaleString(), icon: UsersIcon },
-    { label: "Following", value: followCounts.following.toLocaleString(), icon: UsersIcon },
-    { label: "On Pulse", value: formatTenure(profile.createdAt), icon: SparklesIcon },
-  ]
 
   const details: {
     key: string

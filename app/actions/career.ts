@@ -89,7 +89,7 @@ export async function updateSkills(skills: string[]): Promise<ActionResult> {
 
   await db
     .update(userTable)
-    .set({ skills: cleaned, updatedAt: new Date() })
+    .set({ skills: JSON.stringify(cleaned), updatedAt: new Date() })
     .where(eq(userTable.id, userId))
 
   revalidateProfile()
@@ -118,7 +118,7 @@ export async function updateWorkflowSteps(steps: WorkflowStep[]): Promise<Action
 
   await db
     .update(userTable)
-    .set({ workflowSteps: cleaned, updatedAt: new Date() })
+    .set({ workflowSteps: JSON.stringify(cleaned), updatedAt: new Date() })
     .where(eq(userTable.id, userId))
 
   revalidateProfile()

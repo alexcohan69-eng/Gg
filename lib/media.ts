@@ -145,6 +145,21 @@ export function mediaUrlToPathname(url: string): string | null {
   }
 }
 
+/**
+ * `posts.media` is stored as JSON-encoded TEXT (Aurora DSQL has no
+ * JSON/JSONB column type) — parse defensively so a null or malformed
+ * value falls back to an empty list instead of throwing.
+ */
+export function parseMediaColumn(value: string | null): MediaAttachment[] {
+  if (!value) return []
+  try {
+    const parsed = JSON.parse(value)
+    return Array.isArray(parsed) ? (parsed as MediaAttachment[]) : []
+  } catch {
+    return []
+  }
+}
+
 /** Avatar/banner uploads allow images and GIFs, but never video. */
 export const ALLOWED_PROFILE_IMAGE_TYPES = [
   ...ALLOWED_IMAGE_TYPES,

@@ -1,41 +1,53 @@
-// One-off bootstrap: this Aurora instance is brand new in this
+// One-off bootstrap: this Aurora DSQL cluster is brand new in this
 // environment (fresh account/session) and has zero tables. This
 // recreates the full schema described by lib/db/schema.ts, including
 // the unique constraints application code relies on for
 // onConflictDoNothing() (follows, likes, bookmarks, reposts, and
 // Better Auth's account issuer+accountId pair). Safe to re-run: every
 // statement is IF NOT EXISTS / idempotent.
-import { Signer } from "@aws-sdk/rds-signer"
+//
+// Aurora DSQL compatibility notes (this is NOT Aurora PostgreSQL):
+// - Auth uses the DSQL token signer (DsqlSigner), not @aws-sdk/rds-signer.
+// - No JSON/JSONB or array column types — see lib/db/schema.ts, these
+//   are TEXT columns with JSON encode/decode in app code.
+// - No foreign key constraints — every "userId"-style column is plain
+//   text; referential integrity is enforced in application code.
+// - No SERIAL — every table already uses app-generated text ids.
+// - Indexes must be created with CREATE INDEX ASYNC / CREATE UNIQUE
+//   INDEX ASYNC (synchronous CREATE INDEX is not supported), and only
+//   B-tree indexes are supported.
+// - Extensions (e.g. pg_trgm) are not supported, so the trigram GIN
+//   indexes this project used on Aurora PostgreSQL are dropped here.
+//   ILIKE '%term%' search still works, just as a sequential scan
+//   instead of an index-accelerated one.
+// - Each DDL statement must run in its own transaction (no mixing DDL
+//   statements, and no mixing DDL with DML, in one transaction) — the
+//   loop below already issues one statement per query() call against
+//   an autocommit connection, so this is satisfied naturally.
+import { DsqlSigner } from "@aws-sdk/dsql-signer"
 import { awsCredentialsProvider } from "@vercel/functions/oidc"
 import { Pool } from "pg"
 
-const signer = new Signer({
+const signer = new DsqlSigner({
   credentials: awsCredentialsProvider({
     roleArn: process.env.AWS_ROLE_ARN,
     clientConfig: { region: process.env.AWS_REGION },
   }),
   region: process.env.AWS_REGION,
   hostname: process.env.PGHOST,
-  username: process.env.PGUSER || "postgres",
-  port: 5432,
 })
 
 const pool = new Pool({
   host: process.env.PGHOST,
   database: process.env.PGDATABASE || "postgres",
   port: 5432,
-  user: process.env.PGUSER || "postgres",
-  password: () => signer.getAuthToken(),
+  user: process.env.PGUSER || "admin",
+  password: () => signer.getDbConnectAdminAuthToken(),
   ssl: { rejectUnauthorized: false },
   max: 2,
 })
 
 const statements = [
-  // Enables trigram-based indexes so ILIKE '%term%' partial-match
-  // search on user name/username and post content can use a GIN index
-  // instead of a full sequential scan as either table grows.
-  `create extension if not exists pg_trgm`,
-
   // Better Auth core tables
   `create table if not exists "user" (
     id text primary key,
@@ -59,14 +71,14 @@ const statements = [
     "updatedAt" timestamp not null default now(),
     "ipAddress" text,
     "userAgent" text,
-    "userId" text not null references "user"(id) on delete cascade
+    "userId" text not null
   )`,
   `create table if not exists "account" (
     id text primary key,
     "accountId" text not null,
     "providerId" text not null,
     issuer text not null,
-    "userId" text not null references "user"(id) on delete cascade,
+    "userId" text not null,
     "accessToken" text,
     "refreshToken" text,
     "idToken" text,
@@ -77,9 +89,7 @@ const statements = [
     "createdAt" timestamp not null default now(),
     "updatedAt" timestamp not null default now()
   )`,
-  `create unique index if not exists account_issuer_accountId_uidx on "account" (issuer, "accountId")`,
-  `create index if not exists user_name_trgm_idx on "user" using gin (name gin_trgm_ops)`,
-  `create index if not exists user_username_trgm_idx on "user" using gin (username gin_trgm_ops)`,
+  `create unique index async if not exists account_issuer_accountId_uidx on "account" (issuer, "accountId")`,
   `create table if not exists "verification" (
     id text primary key,
     identifier text not null,
@@ -93,11 +103,15 @@ const statements = [
   // client/project totals, skills, workflow). Added via ALTER TABLE
   // rather than being in the CREATE TABLE above since "user" already
   // existed in prior environments before this feature.
+  // Long-form rich-text About section (separate from the short "bio"
+  // field, which predates this and is used in the header/card previews).
+  `alter table "user" add column if not exists "about" text`,
   `alter table "user" add column if not exists "yearsExperience" integer`,
   `alter table "user" add column if not exists "totalClients" integer`,
   `alter table "user" add column if not exists "totalProjects" integer`,
-  `alter table "user" add column if not exists "skills" jsonb default '[]'`,
-  `alter table "user" add column if not exists "workflowSteps" jsonb default '[]'`,
+  // JSON-encoded TEXT, not jsonb — Aurora DSQL has no JSON/JSONB column type.
+  `alter table "user" add column if not exists "skills" text`,
+  `alter table "user" add column if not exists "workflowSteps" text`,
 
   `create table if not exists "workExperience" (
     id text primary key,
@@ -111,14 +125,14 @@ const statements = [
     "sortOrder" integer not null default 0,
     "createdAt" timestamp not null default now()
   )`,
-  `create index if not exists workExperience_userId_sortOrder_idx on "workExperience" ("userId", "sortOrder")`,
+  `create index async if not exists workExperience_userId_sortOrder_idx on "workExperience" ("userId", "sortOrder")`,
 
   // App tables
   `create table if not exists "posts" (
     id text primary key,
     "userId" text not null,
     content text not null,
-    media jsonb default '[]',
+    media text,
     "replyToId" text,
     "repostOfId" text,
     "quoteOfId" text,
@@ -129,10 +143,9 @@ const statements = [
     "repostCount" integer not null default 0,
     "createdAt" timestamp not null default now()
   )`,
-  `create index if not exists posts_userId_idx on "posts" ("userId")`,
-  `create index if not exists posts_replyToId_idx on "posts" ("replyToId")`,
-  `create index if not exists posts_createdAt_idx on "posts" ("createdAt")`,
-  `create index if not exists posts_content_trgm_idx on "posts" using gin (content gin_trgm_ops)`,
+  `create index async if not exists posts_userId_idx on "posts" ("userId")`,
+  `create index async if not exists posts_replyToId_idx on "posts" ("replyToId")`,
+  `create index async if not exists posts_createdAt_idx on "posts" ("createdAt")`,
 
   `create table if not exists "follows" (
     id text primary key,
@@ -140,8 +153,8 @@ const statements = [
     "followingId" text not null,
     "createdAt" timestamp not null default now()
   )`,
-  `create unique index if not exists follows_follower_following_uidx on "follows" ("followerId", "followingId")`,
-  `create index if not exists follows_followingId_idx on "follows" ("followingId")`,
+  `create unique index async if not exists follows_follower_following_uidx on "follows" ("followerId", "followingId")`,
+  `create index async if not exists follows_followingId_idx on "follows" ("followingId")`,
 
   `create table if not exists "likes" (
     id text primary key,
@@ -149,8 +162,8 @@ const statements = [
     "postId" text not null,
     "createdAt" timestamp not null default now()
   )`,
-  `create unique index if not exists likes_user_post_uidx on "likes" ("userId", "postId")`,
-  `create index if not exists likes_postId_idx on "likes" ("postId")`,
+  `create unique index async if not exists likes_user_post_uidx on "likes" ("userId", "postId")`,
+  `create index async if not exists likes_postId_idx on "likes" ("postId")`,
 
   `create table if not exists "bookmarks" (
     id text primary key,
@@ -158,7 +171,7 @@ const statements = [
     "postId" text not null,
     "createdAt" timestamp not null default now()
   )`,
-  `create unique index if not exists bookmarks_user_post_uidx on "bookmarks" ("userId", "postId")`,
+  `create unique index async if not exists bookmarks_user_post_uidx on "bookmarks" ("userId", "postId")`,
 
   `create table if not exists "reposts" (
     id text primary key,
@@ -166,8 +179,8 @@ const statements = [
     "postId" text not null,
     "createdAt" timestamp not null default now()
   )`,
-  `create unique index if not exists reposts_user_post_uidx on "reposts" ("userId", "postId")`,
-  `create index if not exists reposts_postId_idx on "reposts" ("postId")`,
+  `create unique index async if not exists reposts_user_post_uidx on "reposts" ("userId", "postId")`,
+  `create index async if not exists reposts_postId_idx on "reposts" ("postId")`,
 
   `create table if not exists "notifications" (
     id text primary key,
@@ -178,8 +191,11 @@ const statements = [
     "isRead" boolean not null default false,
     "createdAt" timestamp not null default now()
   )`,
-  `create index if not exists notifications_userId_createdAt_idx on "notifications" ("userId", "createdAt" desc)`,
-  `create index if not exists notifications_userId_isRead_idx on "notifications" ("userId", "isRead")`,
+  // DSQL doesn't support specifying sort order (desc) on index keys —
+  // the index still accelerates the equality filter on userId even
+  // without it, the app just sorts the (small) result set in memory.
+  `create index async if not exists notifications_userId_createdAt_idx on "notifications" ("userId", "createdAt")`,
+  `create index async if not exists notifications_userId_isRead_idx on "notifications" ("userId", "isRead")`,
 
   // "user1Id"/"user2Id" are always stored with the smaller id first
   // (see sortPair in lib/messages.ts), so a single unique index on the
@@ -192,12 +208,12 @@ const statements = [
     "lastMessageAt" timestamp not null default now(),
     "createdAt" timestamp not null default now()
   )`,
-  `create unique index if not exists conversations_user_pair_uidx on "conversations" ("user1Id", "user2Id")`,
+  `create unique index async if not exists conversations_user_pair_uidx on "conversations" ("user1Id", "user2Id")`,
   // Composite indexes (rather than plain single-column ones) so the
   // inbox query's "conversations for this user, newest first" can use
   // the index for both the equality filter and the ORDER BY.
-  `create index if not exists conversations_user1Id_lastMessageAt_idx on "conversations" ("user1Id", "lastMessageAt" desc)`,
-  `create index if not exists conversations_user2Id_lastMessageAt_idx on "conversations" ("user2Id", "lastMessageAt" desc)`,
+  `create index async if not exists conversations_user1Id_lastMessageAt_idx on "conversations" ("user1Id", "lastMessageAt")`,
+  `create index async if not exists conversations_user2Id_lastMessageAt_idx on "conversations" ("user2Id", "lastMessageAt")`,
 
   `create table if not exists "messages" (
     id text primary key,
@@ -207,10 +223,10 @@ const statements = [
     "isRead" boolean not null default false,
     "createdAt" timestamp not null default now()
   )`,
-  `create index if not exists messages_conversationId_createdAt_idx on "messages" ("conversationId", "createdAt")`,
+  `create index async if not exists messages_conversationId_createdAt_idx on "messages" ("conversationId", "createdAt")`,
   // Backs the inbox's per-conversation unread count (messages from the
   // other participant that this viewer hasn't read yet).
-  `create index if not exists messages_conversationId_isRead_idx on "messages" ("conversationId", "isRead")`,
+  `create index async if not exists messages_conversationId_isRead_idx on "messages" ("conversationId", "isRead")`,
 
   // Moderation MVP: blocks + reports
   `create table if not exists "blocks" (
@@ -219,8 +235,8 @@ const statements = [
     "blockedId" text not null,
     "createdAt" timestamp not null default now()
   )`,
-  `create unique index if not exists blocks_blocker_blocked_uidx on "blocks" ("blockerId", "blockedId")`,
-  `create index if not exists blocks_blockedId_idx on "blocks" ("blockedId")`,
+  `create unique index async if not exists blocks_blocker_blocked_uidx on "blocks" ("blockerId", "blockedId")`,
+  `create index async if not exists blocks_blockedId_idx on "blocks" ("blockedId")`,
 
   `create table if not exists "reports" (
     id text primary key,
@@ -235,9 +251,9 @@ const statements = [
   )`,
   // Prevents the same user from spamming duplicate reports of the same
   // target — mirrors the likes/bookmarks/reposts onConflictDoNothing pattern.
-  `create unique index if not exists reports_reporter_target_uidx on "reports" ("reporterId", "targetType", "targetId")`,
+  `create unique index async if not exists reports_reporter_target_uidx on "reports" ("reporterId", "targetType", "targetId")`,
   // Backs the admin review queue's "open reports first" listing.
-  `create index if not exists reports_status_createdAt_idx on "reports" ("status", "createdAt" desc)`,
+  `create index async if not exists reports_status_createdAt_idx on "reports" ("status", "createdAt")`,
 ]
 
 const client = await pool.connect()

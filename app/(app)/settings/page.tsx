@@ -6,6 +6,7 @@ import { getCareerProfile, getWorkExperience } from "@/lib/career"
 import { PageHeader } from "@/components/page-header"
 import { ProfileImageEditor } from "@/components/profile-image-editor"
 import { ProfileSettingsForm } from "@/components/profile-settings-form"
+import { AboutEditor } from "@/components/about-editor"
 import { CareerStatsForm } from "@/components/career-stats-form"
 import { SkillsEditor } from "@/components/skills-editor"
 import { WorkflowStepsEditor } from "@/components/workflow-steps-editor"
@@ -31,6 +32,7 @@ export default async function SettingsPage() {
   const user = session.user as typeof session.user & {
     username?: string | null
     bio?: string | null
+    about?: string | null
     website?: string | null
     location?: string | null
     bannerImage?: string | null
@@ -68,6 +70,19 @@ export default async function SettingsPage() {
                 location: user.location ?? null,
               }}
             />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>About</CardTitle>
+            <CardDescription>
+              A longer, formatted write-up shown on your About page. Separate
+              from the short bio on your profile header.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <AboutEditor about={user.about ?? null} />
           </CardContent>
         </Card>
 

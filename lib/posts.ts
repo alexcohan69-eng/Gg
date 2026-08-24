@@ -2,7 +2,7 @@ import { cache } from "react"
 import { and, asc, count, desc, eq, gt, inArray, notInArray, sql } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { bookmarks, follows, likes, posts, reposts, user } from "@/lib/db/schema"
-import type { MediaAttachment } from "@/lib/media"
+import { parseMediaColumn, type MediaAttachment } from "@/lib/media"
 
 /**
  * `notInArray` with an empty list isn't a no-op filter in SQL (it can
@@ -38,6 +38,25 @@ export type FeedPost = {
   isBookmarked: boolean
   isReposted: boolean
   replyToId: string | null
+}
+
+/**
+ * `posts.media` comes back from the query as the raw JSON-encoded TEXT
+ * column (Aurora DSQL has no JSON/JSONB type) — every feed query below
+ * runs its rows through this before returning so callers only ever see
+ * the parsed `MediaAttachment[] | null` shape.
+ */
+function parseFeedPostRow<T extends { media: string | null }>(
+  row: T,
+): Omit<T, "media"> & { media: MediaAttachment[] | null } {
+  const media = parseMediaColumn(row.media)
+  return { ...row, media: media.length > 0 ? media : null }
+}
+
+function parseFeedPostRows<T extends { media: string | null }>(
+  rows: T[],
+): (Omit<T, "media"> & { media: MediaAttachment[] | null })[] {
+  return rows.map(parseFeedPostRow)
 }
 
 const FEED_PAGE_SIZE = 30
@@ -99,10 +118,12 @@ export async function getFeedPosts(
       and(eq(bookmarks.postId, posts.id), eq(bookmarks.userId, viewerId)),
     )
 
-  return withLikeAndRepostJoins(query, viewerId)
+  const rows = await withLikeAndRepostJoins(query, viewerId)
     .where(and(eq(posts.isReply, false), excludeAuthorsCondition(excludeUserIds)))
     .orderBy(desc(posts.createdAt))
     .limit(limit)
+
+  return parseFeedPostRows(rows)
 }
 
 /**
@@ -138,7 +159,7 @@ export async function getFollowingFeed(
       and(eq(bookmarks.postId, posts.id), eq(bookmarks.userId, viewerId)),
     )
 
-  return withLikeAndRepostJoins(query, viewerId)
+  const rows = await withLikeAndRepostJoins(query, viewerId)
     .where(
       and(
         eq(posts.isReply, false),
@@ -148,6 +169,8 @@ export async function getFollowingFeed(
     )
     .orderBy(desc(posts.createdAt))
     .limit(limit)
+
+  return parseFeedPostRows(rows)
 }
 
 /**
@@ -222,10 +245,12 @@ export async function getUserPosts(
       and(eq(bookmarks.postId, posts.id), eq(bookmarks.userId, viewerId)),
     )
 
-  return withLikeAndRepostJoins(query, viewerId)
+  const rows = await withLikeAndRepostJoins(query, viewerId)
     .where(and(eq(posts.userId, userId), eq(posts.isReply, false)))
     .orderBy(desc(posts.createdAt))
     .limit(limit)
+
+  return parseFeedPostRows(rows)
 }
 
 /**
@@ -250,10 +275,12 @@ export async function getBookmarkedPosts(
     .innerJoin(posts, eq(bookmarks.postId, posts.id))
     .innerJoin(user, eq(posts.userId, user.id))
 
-  return withLikeAndRepostJoins(query, viewerId)
+  const rows = await withLikeAndRepostJoins(query, viewerId)
     .where(and(eq(bookmarks.userId, viewerId), excludeAuthorsCondition(excludeUserIds)))
     .orderBy(desc(bookmarks.createdAt))
     .limit(limit)
+
+  return parseFeedPostRows(rows)
 }
 
 /**
@@ -288,7 +315,7 @@ export const getPostById = cache(async function getPostById(
     .where(eq(posts.id, postId))
     .limit(1)
 
-  return rows[0] ?? null
+  return rows[0] ? parseFeedPostRow(rows[0]) : null
 })
 
 /**
@@ -317,8 +344,10 @@ export async function getPostReplies(
       and(eq(bookmarks.postId, posts.id), eq(bookmarks.userId, viewerId)),
     )
 
-  return withLikeAndRepostJoins(query, viewerId)
+  const rows = await withLikeAndRepostJoins(query, viewerId)
     .where(and(eq(posts.replyToId, postId), excludeAuthorsCondition(excludeUserIds)))
     .orderBy(asc(posts.createdAt))
     .limit(limit)
+
+  return parseFeedPostRows(rows)
 }
