@@ -1,6 +1,6 @@
 "use client"
 
-import { EditorContent, useEditor, type Editor } from "@tiptap/react"
+import { EditorContent, useEditor, useEditorState, type Editor } from "@tiptap/react"
 import StarterKit from "@tiptap/starter-kit"
 import Placeholder from "@tiptap/extension-placeholder"
 import {
@@ -58,7 +58,32 @@ export function RichTextToolbar({
   editor: Editor | null
   className?: string
 }) {
-  if (!editor) return null
+  // Buttons render `editor.isActive(...)` directly, but `editor` itself is
+  // a stable object reference — reading it during render doesn't cause a
+  // re-render when the *selection* moves (e.g. clicking inside existing
+  // bold text) or when a mark is toggled with the cursor collapsed (no
+  // text selected, so no doc change fires). `useEditorState` subscribes
+  // to the editor's transactions and re-renders this component whenever
+  // any of these selector values change, so the pressed/highlighted
+  // state always reflects what's actually active at the cursor.
+  const activeMarks = useEditorState({
+    editor,
+    selector: ({ editor }) =>
+      editor
+        ? {
+            bold: editor.isActive("bold"),
+            italic: editor.isActive("italic"),
+            strike: editor.isActive("strike"),
+            link: editor.isActive("link"),
+            bulletList: editor.isActive("bulletList"),
+            orderedList: editor.isActive("orderedList"),
+            blockquote: editor.isActive("blockquote"),
+            code: editor.isActive("code"),
+          }
+        : null,
+  })
+
+  if (!editor || !activeMarks) return null
 
   // Narrow into a local const: TypeScript doesn't retain the `!editor`
   // guard above across the `toggleLink` closure since `editor` is a
@@ -87,53 +112,53 @@ export function RichTextToolbar({
     >
       <ToolbarButton
         label="Bold"
-        active={editor.isActive("bold")}
+        active={activeMarks.bold}
         onClick={() => editor.chain().focus().toggleBold().run()}
       >
         <BoldIcon />
       </ToolbarButton>
       <ToolbarButton
         label="Italic"
-        active={editor.isActive("italic")}
+        active={activeMarks.italic}
         onClick={() => editor.chain().focus().toggleItalic().run()}
       >
         <ItalicIcon />
       </ToolbarButton>
       <ToolbarButton
         label="Strikethrough"
-        active={editor.isActive("strike")}
+        active={activeMarks.strike}
         onClick={() => editor.chain().focus().toggleStrike().run()}
       >
         <StrikethroughIcon />
       </ToolbarButton>
-      <ToolbarButton label="Link" active={editor.isActive("link")} onClick={toggleLink}>
+      <ToolbarButton label="Link" active={activeMarks.link} onClick={toggleLink}>
         <LinkIcon />
       </ToolbarButton>
       <span className="mx-0.5 h-4 w-px bg-border" aria-hidden="true" />
       <ToolbarButton
         label="Bulleted list"
-        active={editor.isActive("bulletList")}
+        active={activeMarks.bulletList}
         onClick={() => editor.chain().focus().toggleBulletList().run()}
       >
         <ListIcon />
       </ToolbarButton>
       <ToolbarButton
         label="Numbered list"
-        active={editor.isActive("orderedList")}
+        active={activeMarks.orderedList}
         onClick={() => editor.chain().focus().toggleOrderedList().run()}
       >
         <ListOrderedIcon />
       </ToolbarButton>
       <ToolbarButton
         label="Quote"
-        active={editor.isActive("blockquote")}
+        active={activeMarks.blockquote}
         onClick={() => editor.chain().focus().toggleBlockquote().run()}
       >
         <QuoteIcon />
       </ToolbarButton>
       <ToolbarButton
         label="Code"
-        active={editor.isActive("code")}
+        active={activeMarks.code}
         onClick={() => editor.chain().focus().toggleCode().run()}
       >
         <CodeIcon />
