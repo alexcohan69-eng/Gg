@@ -6,9 +6,10 @@ import { toast } from "sonner"
 import {
   ArrowDownIcon,
   ArrowUpIcon,
-  BriefcaseIcon,
+  MoreHorizontalIcon,
   PencilIcon,
   PlusIcon,
+  SparklesIcon,
   Trash2Icon,
 } from "lucide-react"
 import { deletePortfolioProject, movePortfolioProject } from "@/app/actions/portfolio"
@@ -24,6 +25,13 @@ import {
   EmptyDescription,
   EmptyContent,
 } from "@/components/ui/empty"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import {
   AlertDialog,
   AlertDialogContent,
@@ -82,51 +90,53 @@ function OwnerProjectTile({
   return (
     <div className="relative">
       <PortfolioProjectCard project={project} profileIdentifier={profileIdentifier} />
-      <div className="absolute right-2 top-2 flex gap-1 rounded-full bg-background/90 p-1 shadow-sm backdrop-blur-sm">
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          className="rounded-full"
-          disabled={isFirst || isPending}
-          onClick={() => handleMove("up")}
-          aria-label="Move up"
-        >
-          <ArrowUpIcon />
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          className="rounded-full"
-          disabled={isLast || isPending}
-          onClick={() => handleMove("down")}
-          aria-label="Move down"
-        >
-          <ArrowDownIcon />
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          className="rounded-full"
-          disabled={isPending}
-          onClick={() => setEditOpen(true)}
-          aria-label="Edit project"
-        >
-          <PencilIcon />
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          className="rounded-full text-destructive hover:text-destructive"
-          disabled={isPending}
-          onClick={() => setDeleteOpen(true)}
-          aria-label="Delete project"
-        >
-          <Trash2Icon />
-        </Button>
+
+      <div className="absolute top-2.5 right-2.5">
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                className="rounded-full bg-background/90 text-foreground shadow-sm backdrop-blur-sm hover:bg-background"
+                disabled={isPending}
+                aria-label="Project options"
+              >
+                {isPending ? <Spinner /> : <MoreHorizontalIcon />}
+              </Button>
+            }
+          />
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem
+              disabled={isFirst || isPending}
+              onClick={() => handleMove("up")}
+            >
+              <ArrowUpIcon data-icon="inline-start" />
+              Move up
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              disabled={isLast || isPending}
+              onClick={() => handleMove("down")}
+            >
+              <ArrowDownIcon data-icon="inline-start" />
+              Move down
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem disabled={isPending} onClick={() => setEditOpen(true)}>
+              <PencilIcon data-icon="inline-start" />
+              Edit project
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              variant="destructive"
+              disabled={isPending}
+              onClick={() => setDeleteOpen(true)}
+            >
+              <Trash2Icon data-icon="inline-start" />
+              Delete project
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       <PortfolioProjectDialog
@@ -189,15 +199,20 @@ export function PortfolioGrid({
   if (projects.length === 0) {
     return (
       <div className="p-4">
-        <Empty>
+        <Empty className="border border-dashed border-border bg-card/50 py-10">
           <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <BriefcaseIcon />
+            <EmptyMedia
+              variant="icon"
+              className="size-12 rounded-2xl bg-primary/10 text-primary [&_svg:not([class*='size-'])]:size-5"
+            >
+              <SparklesIcon />
             </EmptyMedia>
-            <EmptyTitle>No projects yet</EmptyTitle>
+            <EmptyTitle className="text-base">
+              {isSelf ? "Showcase your best work" : "No projects yet"}
+            </EmptyTitle>
             <EmptyDescription>
               {isSelf
-                ? "Add your first case study to start building your portfolio."
+                ? "Add case studies with images, tags, and a client to start building your portfolio."
                 : `${name} hasn't added any projects yet.`}
             </EmptyDescription>
           </EmptyHeader>
@@ -205,7 +220,7 @@ export function PortfolioGrid({
             <EmptyContent>
               <Button type="button" onClick={() => setAddOpen(true)}>
                 <PlusIcon data-icon="inline-start" />
-                Add project
+                Add your first project
               </Button>
             </EmptyContent>
           ) : null}
@@ -218,10 +233,15 @@ export function PortfolioGrid({
 
   return (
     <div className="flex flex-col gap-4 p-4">
-      {isSelf ? (
-        <div>
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm text-muted-foreground">
+          {projects.length} {projects.length === 1 ? "project" : "projects"}
+          {isSelf ? ` · ${MAX_PROJECTS - projects.length} remaining` : null}
+        </p>
+        {isSelf ? (
           <Button
             type="button"
+            size="sm"
             variant="outline"
             onClick={() => setAddOpen(true)}
             disabled={projects.length >= MAX_PROJECTS}
@@ -229,8 +249,8 @@ export function PortfolioGrid({
             <PlusIcon data-icon="inline-start" />
             Add project
           </Button>
-        </div>
-      ) : null}
+        ) : null}
+      </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         {projects.map((project, index) =>
