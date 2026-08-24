@@ -49,10 +49,12 @@ export const pool = new Pool({
   // Recycles idle pooled connections so a stuck/half-open socket
   // doesn't sit in the pool indefinitely between requests.
   idleTimeoutMillis: 30_000,
-  // Caps how long the server will wait on a single statement. A
-  // runaway/blocked query (e.g. lock contention) fails and frees the
-  // connection instead of holding it — and the request — forever.
-  statement_timeout: 15_000,
+  // NOTE: statement_timeout is intentionally NOT set here. `pg` sends it
+  // as a startup/session GUC, and Aurora DSQL's Postgres-compatible
+  // endpoint rejects unsupported session parameters at connect time
+  // ("setting configuration parameter ... not supported"), which fails
+  // every connection in the pool. DSQL enforces its own transaction
+  // duration limit server-side instead.
 })
 attachDatabasePool(pool)
 

@@ -17,7 +17,7 @@ import {
 import { getSessionWithRetry } from "@/lib/auth"
 import { getCareerProfile, getWorkExperience } from "@/lib/career"
 import { getProfileByIdentifier, isFollowing } from "@/lib/follows"
-import { sanitizePostHtml } from "@/lib/sanitize-html"
+import { isHtmlContentEmpty, sanitizePostHtml } from "@/lib/sanitize-html"
 import { getInitials, profileHref } from "@/lib/utils"
 import { PageHeader } from "@/components/page-header"
 import { BackButton } from "@/components/back-button"
@@ -234,45 +234,26 @@ export default async function ProfileAboutPage({
           </div>
         </section>
 
-        {/* Highlights — portfolio-style metrics strip */}
-        <section
-          aria-label="Highlights"
-          className="grid grid-cols-2 gap-3 sm:grid-cols-4"
-        >
-          {stats.map((stat) => {
-            const Icon = stat.icon
-            return (
-              <div
-                key={stat.label}
-                className="flex flex-col gap-2 rounded-xl border border-border bg-card p-4"
-              >
-                <Icon className="size-4 text-muted-foreground" aria-hidden="true" />
-                <span className="font-heading text-xl font-semibold tracking-tight text-foreground">
-                  {stat.value}
-                </span>
-                <span className="text-xs text-muted-foreground">{stat.label}</span>
-              </div>
-            )
-          })}
-        </section>
-
-        {/* About — narrative bio */}
+        {/* About — rich-text narrative written from settings */}
         <section className="rounded-2xl border border-border bg-card p-5">
           <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             About
           </h3>
-          {profile.bio ? (
-            <p className="mt-3 whitespace-pre-line text-pretty text-base leading-relaxed text-foreground">
-              {profile.bio}
-            </p>
+          {profile.about && !isHtmlContentEmpty(profile.about) ? (
+            <div
+              className="prose-post mt-3 text-pretty break-words text-base leading-relaxed text-foreground"
+              // Sanitized again here (defense-in-depth) even though updateAbout
+              // already sanitizes before storing.
+              dangerouslySetInnerHTML={{ __html: sanitizePostHtml(profile.about) }}
+            />
           ) : (
             <p className="mt-3 text-base leading-relaxed text-muted-foreground">
               {isSelf
-                ? "You haven't added a bio yet. Add one from settings to introduce yourself."
-                : `${profile.name} hasn't written a bio yet.`}
+                ? "You haven't written an about section yet. Add one from settings to introduce yourself."
+                : `${profile.name} hasn't written an about section yet.`}
             </p>
           )}
-          {isSelf && !profile.bio ? (
+          {isSelf && (!profile.about || isHtmlContentEmpty(profile.about)) ? (
             <Button
               variant="outline"
               size="sm"
@@ -280,7 +261,7 @@ export default async function ProfileAboutPage({
               nativeButton={false}
               render={<a href="/settings" />}
             >
-              Add a bio
+              Add an about section
             </Button>
           ) : null}
         </section>
