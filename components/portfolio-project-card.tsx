@@ -1,6 +1,6 @@
 import Link from "next/link"
 import Image from "next/image"
-import { ArrowUpRightIcon, ImageIcon } from "lucide-react"
+import { ArrowUpRightIcon, ImageIcon, PlayIcon } from "lucide-react"
 import type { PortfolioProject } from "@/lib/portfolio"
 import { Badge } from "@/components/ui/badge"
 
@@ -24,18 +24,40 @@ export function PortfolioProjectCard({
     >
       <div className="relative aspect-[4/5] w-full overflow-hidden bg-muted">
         {project.coverImage ? (
-          <Image
-            src={project.coverImage}
-            alt={`Cover image for ${project.title}`}
-            fill
-            unoptimized
-            className="object-cover transition-transform duration-500 ease-out group-hover:scale-[1.06]"
-          />
+          project.coverImageType === "video" ? (
+            <video
+              src={project.coverImage}
+              muted
+              playsInline
+              preload="metadata"
+              className="size-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.06]"
+              aria-hidden="true"
+            />
+          ) : (
+            <Image
+              src={project.coverImage}
+              alt={`Cover ${project.coverImageType === "gif" ? "GIF" : "image"} for ${project.title}`}
+              fill
+              unoptimized
+              className="object-cover transition-transform duration-500 ease-out group-hover:scale-[1.06]"
+            />
+          )
         ) : (
           <div className="flex h-full w-full items-center justify-center">
             <ImageIcon className="size-8 text-muted-foreground" aria-hidden="true" />
           </div>
         )}
+        {project.coverImageType === "video" ? (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/10">
+            <span className="flex size-9 items-center justify-center rounded-full bg-background/90 text-foreground shadow-sm">
+              <PlayIcon className="size-4 fill-current" aria-hidden="true" />
+            </span>
+          </div>
+        ) : project.coverImageType === "gif" ? (
+          <span className="absolute bottom-2 left-2 rounded bg-background/80 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-foreground backdrop-blur-sm">
+            GIF
+          </span>
+        ) : null}
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/55 via-black/0 to-black/0 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
         <div className="absolute right-2.5 bottom-2.5 flex size-7 translate-y-1 items-center justify-center rounded-full bg-background/90 text-foreground opacity-0 shadow-sm backdrop-blur-sm transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100">
           <ArrowUpRightIcon className="size-3.5" aria-hidden="true" />
