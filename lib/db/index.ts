@@ -1,6 +1,6 @@
 import { drizzle } from "drizzle-orm/node-postgres"
 import { Pool } from "pg"
-import { DsqlSigner } from "@aws-sdk/dsql-signer"
+import { Signer } from "@aws-sdk/rds-signer"
 import { awsCredentialsProvider } from "@vercel/functions/oidc"
 import { attachDatabasePool } from "@vercel/functions"
 import { assertRequiredEnv } from "@/lib/env"
@@ -12,29 +12,32 @@ import * as schema from "./schema"
 assertRequiredEnv()
 
 /**
- * Connects to Aurora DSQL via IAM auth over Vercel's OIDC
+ * Connects to Aurora PostgreSQL via IAM auth over Vercel's OIDC
  * federation — there are no static AWS keys or a DATABASE_URL in this
- * setup. The signer's short-lived admin auth token is used as the
- * Postgres password and the `pg` pool refreshes it automatically on
- * demand. Note: DSQL uses its own `DsqlSigner`, not the RDS/Aurora
- * PostgreSQL `Signer` — they produce incompatible tokens.
+ * setup. The signer's short-lived auth token is used as the Postgres
+ * password and the `pg` pool calls it fresh on every new connection.
+ * Note: Aurora PostgreSQL uses the RDS/Aurora `Signer`, not DSQL's
+ * `DsqlSigner` — they produce incompatible tokens.
  */
-const signer = new DsqlSigner({
+const signer = new Signer({
   credentials: awsCredentialsProvider({
     roleArn: process.env.AWS_ROLE_ARN!,
     clientConfig: { region: process.env.AWS_REGION },
   }),
   region: process.env.AWS_REGION,
   hostname: process.env.PGHOST!,
-  expiresIn: 900,
+  username: process.env.PGUSER || "postgres",
+  port: 5432,
 })
 
 export const pool = new Pool({
   host: process.env.PGHOST,
   database: process.env.PGDATABASE || "postgres",
   port: 5432,
-  user: process.env.PGUSER || "admin",
-  password: () => signer.getDbConnectAdminAuthToken(),
+  user: process.env.PGUSER || "postgres",
+  // The auth token can be cached for up to 15 minutes (900 seconds);
+  // the pool calls this fresh per new connection.
+  password: () => signer.getAuthToken(),
   ssl: { rejectUnauthorized: false },
   max: 20,
   // Without an explicit connection timeout, `pg` waits indefinitely
