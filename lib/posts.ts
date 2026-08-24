@@ -40,22 +40,21 @@ export type FeedPost = {
   replyToId: string | null
 }
 
+/** Raw feed post row shape as it comes back from the query, before media parsing. */
+type RawFeedPostRow = Omit<FeedPost, "media"> & { media: string | null }
+
 /**
  * `posts.media` comes back from the query as the raw JSON-encoded TEXT
  * column (Aurora DSQL has no JSON/JSONB type) — every feed query below
  * runs its rows through this before returning so callers only ever see
  * the parsed `MediaAttachment[] | null` shape.
  */
-function parseFeedPostRow<T extends { media: string | null }>(
-  row: T,
-): Omit<T, "media"> & { media: MediaAttachment[] | null } {
+function parseFeedPostRow(row: RawFeedPostRow): FeedPost {
   const media = parseMediaColumn(row.media)
   return { ...row, media: media.length > 0 ? media : null }
 }
 
-function parseFeedPostRows<T extends { media: string | null }>(
-  rows: T[],
-): (Omit<T, "media"> & { media: MediaAttachment[] | null })[] {
+function parseFeedPostRows(rows: RawFeedPostRow[]): FeedPost[] {
   return rows.map(parseFeedPostRow)
 }
 

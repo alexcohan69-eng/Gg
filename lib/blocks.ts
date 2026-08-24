@@ -89,6 +89,7 @@ export async function getBlockedUsers(viewerId: string): Promise<BlockedUser[]> 
       name: user.name,
       username: user.username,
       bio: user.bio,
+      about: user.about,
       image: user.image,
       bannerImage: user.bannerImage,
       website: user.website,

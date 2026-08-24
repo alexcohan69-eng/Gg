@@ -7,7 +7,7 @@ import { db } from "@/lib/db"
 import { posts, reports } from "@/lib/db/schema"
 import { requireAdminUserId } from "@/lib/admin"
 import { logActionError } from "@/lib/log-action-error"
-import { mediaUrlToPathname } from "@/lib/media"
+import { mediaUrlToPathname, parseMediaColumn } from "@/lib/media"
 
 export type AdminActionResult = {
   success: boolean
@@ -115,7 +115,7 @@ export async function adminDeletePost(
       return { success: false, error: "Post not found." }
     }
 
-    const pathnames = (deleted.media ?? [])
+    const pathnames = parseMediaColumn(deleted.media)
       .map((item) => mediaUrlToPathname(item.url))
       .filter((p): p is string => p !== null)
 
