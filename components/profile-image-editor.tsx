@@ -2,6 +2,7 @@
 
 import { useRef, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
+import { upload } from "@vercel/blob/client"
 import { toast } from "sonner"
 import { CameraIcon, XIcon } from "lucide-react"
 import { updateProfileImage } from "@/app/actions/profile"
@@ -45,15 +46,19 @@ export function ProfileImageEditor({
     }
 
     setPendingKind(kind)
-    const body = new FormData()
-    body.set("file", file)
-    body.set("kind", kind)
 
-    fetch("/api/upload/profile-image", { method: "POST", body })
-      .then(async (res) => {
-        const data = await res.json()
-        if (!res.ok) throw new Error(data.error ?? "Upload failed.")
-        return updateProfileImage(kind, data.url as string)
+    // Uploaded straight to Blob storage from the browser (not proxied
+    // through /api/upload/profile-image) so uploads never hit a
+    // serverless function's request-body cap. The route only issues
+    // the short-lived upload token.
+    upload(`profile/${kind}-${file.name}`, file, {
+      access: "private",
+      handleUploadUrl: "/api/upload/profile-image",
+      clientPayload: JSON.stringify({ kind, mime: file.type }),
+    })
+      .then((blob) => {
+        const url = `/api/media?pathname=${encodeURIComponent(blob.pathname)}`
+        return updateProfileImage(kind, url)
       })
       .then((result) => {
         if (result && !result.success) {

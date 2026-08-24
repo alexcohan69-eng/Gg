@@ -10,6 +10,7 @@ import {
 } from "react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
+import { upload } from "@vercel/blob/client"
 import { ImageIcon, TypeIcon, VideoIcon, XIcon } from "lucide-react"
 import { toast } from "sonner"
 import { createPost } from "@/app/actions/posts"
@@ -92,15 +93,19 @@ function useMediaAttachments() {
         { id, previewUrl, type, status: "uploading" },
       ])
 
-      const body = new FormData()
-      body.set("file", file)
-
-      fetch("/api/upload", { method: "POST", body })
-        .then(async (res) => {
-          const data = await res.json()
-          if (!res.ok) throw new Error(data.error ?? "Upload failed.")
+      // Uploaded straight to Blob storage from the browser (not proxied
+      // through /api/upload) so large videos never hit a serverless
+      // function's request-body cap. /api/upload only issues the
+      // short-lived upload token.
+      upload(`posts/${file.name}`, file, {
+        access: "private",
+        handleUploadUrl: "/api/upload",
+        clientPayload: JSON.stringify({ mime: file.type }),
+      })
+        .then((blob) => {
+          const url = `/api/media?pathname=${encodeURIComponent(blob.pathname)}`
           setAttachments((prev) =>
-            prev.map((a) => (a.id === id ? { ...a, status: "done", url: data.url } : a)),
+            prev.map((a) => (a.id === id ? { ...a, status: "done", url } : a)),
           )
         })
         .catch((error: Error) => {

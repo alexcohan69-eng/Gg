@@ -2,6 +2,7 @@
 
 import { useRef, useState, useTransition } from "react"
 import Image from "next/image"
+import { upload } from "@vercel/blob/client"
 import { toast } from "sonner"
 import { CameraIcon, ImagePlusIcon, PlayIcon, XIcon } from "lucide-react"
 import { addPortfolioProject, updatePortfolioProject } from "@/app/actions/portfolio"
@@ -58,18 +59,25 @@ const MEDIA_ACCEPT = ALLOWED_MEDIA_TYPES.join(",")
 /** Inline description images are stills only (see /api/upload/portfolio's "description" kind). */
 const DESCRIPTION_IMAGE_ACCEPT = "image/jpeg,image/png,image/webp,image/gif"
 
-/** Uploads a single file to /api/upload/portfolio and returns its proxy URL + resolved media type. */
+/**
+ * Uploads a single file straight to Blob storage from the browser
+ * (not proxied through /api/upload/portfolio, which only issues the
+ * short-lived upload token) and returns its proxy URL + resolved
+ * media type. Going through the server would fail large videos in
+ * production once they exceed a serverless function's request-body
+ * cap.
+ */
 async function uploadPortfolioMedia(
   file: File,
   kind: "cover" | "gallery" | "description",
 ): Promise<MediaAttachment> {
-  const body = new FormData()
-  body.set("file", file)
-  body.set("kind", kind)
-  const res = await fetch("/api/upload/portfolio", { method: "POST", body })
-  const data = await res.json()
-  if (!res.ok) throw new Error(data.error ?? "Upload failed.")
-  return { url: data.url as string, type: (data.type as MediaType) ?? "image" }
+  const blob = await upload(`portfolio/${kind}-${file.name}`, file, {
+    access: "private",
+    handleUploadUrl: "/api/upload/portfolio",
+    clientPayload: JSON.stringify({ kind, mime: file.type }),
+  })
+  const url = `/api/media?pathname=${encodeURIComponent(blob.pathname)}`
+  return { url, type: getMediaTypeForMime(file.type) ?? "image" }
 }
 
 function CoverMediaPicker({
