@@ -1,17 +1,27 @@
-import { put } from "@vercel/blob"
+import { handleUpload, type HandleUploadBody } from "@vercel/blob/client"
 import { headers } from "next/headers"
 import { NextResponse, type NextRequest } from "next/server"
 import { getSessionWithRetry } from "@/lib/auth"
 import { logActionError } from "@/lib/log-action-error"
-import { getMediaTypeForMime, validateMediaFile } from "@/lib/media"
+import { isAllowedMediaType, maxSizeForMime } from "@/lib/media"
 
 /**
- * Uploads a single image, GIF, or video to Vercel Blob for use as a
- * post attachment. Requires an authenticated session — this is the
- * server-side gate that stops unauthenticated or unauthorized callers
- * from writing to blob storage, since anyone can hit this route's URL
- * directly. This re-validates type and size independently of the
- * composer's own check, which is only a UX shortcut.
+ * Issues a Vercel Blob client-upload token for a post attachment,
+ * then the browser uploads the file straight to Blob storage — never
+ * through this function. A server-proxied `put()` (reading the file
+ * via `request.formData()`, as this route used to) works fine in
+ * local dev but fails real videos/large images in production:
+ * Vercel's request body cap for Route Handlers sits well under the
+ * 20MB video / 5MB image limits this app allows, so large uploads
+ * come back as a raw "Request Entity Too Large" response that can't
+ * be parsed as JSON.
+ *
+ * The client reports the file's real mime type in `clientPayload` up
+ * front so the issued token is locked to exactly that type and its
+ * size cap. Vercel Blob independently re-checks both the content type
+ * and size against the actual upload bytes, so a client that lies
+ * about its mime type just fails the upload rather than bypassing the
+ * limit.
  */
 export async function POST(request: NextRequest) {
   const session = await getSessionWithRetry({ headers: await headers() })
@@ -19,46 +29,41 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
-  let formData: FormData
-  try {
-    formData = await request.formData()
-  } catch {
-    return NextResponse.json({ error: "Invalid upload." }, { status: 400 })
-  }
-
-  const file = formData.get("file")
-  if (!(file instanceof File)) {
-    return NextResponse.json({ error: "No file provided." }, { status: 400 })
-  }
-
-  const validationError = validateMediaFile(file)
-  if (validationError) {
-    return NextResponse.json({ error: validationError }, { status: 400 })
-  }
-
-  const mediaType = getMediaTypeForMime(file.type)
-  if (!mediaType) {
-    return NextResponse.json({ error: "Unsupported file type." }, { status: 400 })
-  }
+  const body = (await request.json()) as HandleUploadBody
 
   try {
-    const blob = await put(`posts/${session.user.id}/${file.name}`, file, {
-      access: "private",
-      addRandomSuffix: true,
+    const jsonResponse = await handleUpload({
+      body,
+      request,
+      onBeforeGenerateToken: async (_pathname, clientPayload) => {
+        let mime = ""
+        try {
+          const parsed = clientPayload ? JSON.parse(clientPayload) : null
+          mime = typeof parsed?.mime === "string" ? parsed.mime : ""
+        } catch {
+          // fall through to the unsupported-type check below
+        }
+        if (!isAllowedMediaType(mime)) {
+          throw new Error(
+            "Only JPEG, PNG, WebP, GIF images and MP4, WebM, or MOV videos are supported.",
+          )
+        }
+
+        return {
+          allowedContentTypes: [mime],
+          maximumSizeInBytes: maxSizeForMime(mime),
+          addRandomSuffix: true,
+          tokenPayload: JSON.stringify({ userId: session.user.id }),
+        }
+      },
     })
 
-    // The store is private, so `blob.url` isn't publicly fetchable. We
-    // persist and render media through `/api/media`, which streams the
-    // file after checking for an authenticated session.
-    return NextResponse.json({
-      url: `/api/media?pathname=${encodeURIComponent(blob.pathname)}`,
-      type: mediaType,
-    })
+    return NextResponse.json(jsonResponse)
   } catch (error) {
     logActionError("uploadMedia", error, { userId: session.user.id })
     return NextResponse.json(
-      { error: "Upload failed. Please try again." },
-      { status: 500 },
+      { error: error instanceof Error ? error.message : "Upload failed. Please try again." },
+      { status: 400 },
     )
   }
 }

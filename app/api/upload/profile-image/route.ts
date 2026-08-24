@@ -1,18 +1,18 @@
-import { put } from "@vercel/blob"
+import { handleUpload, type HandleUploadBody } from "@vercel/blob/client"
 import { headers } from "next/headers"
 import { NextResponse, type NextRequest } from "next/server"
 import { getSessionWithRetry } from "@/lib/auth"
 import { logActionError } from "@/lib/log-action-error"
-import { validateProfileImageFile } from "@/lib/media"
+import { ALLOWED_PROFILE_IMAGE_TYPES, MAX_IMAGE_SIZE_BYTES } from "@/lib/media"
 
 /**
- * Uploads an avatar or banner image to Vercel Blob and hands back a
- * URL through the same private-store + proxy pattern as post
- * attachments (see /api/upload and /api/media): the blob store here
- * is configured private, so `put()` must use `access: "private"` too,
- * and the returned URL points at `/api/media` rather than a raw blob
- * URL. This keeps one storage/security model for all user-uploaded
- * media instead of introducing a second, public store.
+ * Issues a Vercel Blob client-upload token for an avatar or banner
+ * image, then the browser uploads the file straight to Blob storage —
+ * never through this function. See /api/upload and
+ * /api/upload/portfolio for the full rationale: a server-proxied
+ * `put()` works in local dev but fails larger uploads in production
+ * once they exceed Vercel's Route Handler body cap, returning a raw
+ * "Request Entity Too Large" response instead of JSON.
  */
 export async function POST(request: NextRequest) {
   const session = await getSessionWithRetry({ headers: await headers() })
@@ -20,45 +20,44 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
-  let formData: FormData
-  try {
-    formData = await request.formData()
-  } catch {
-    return NextResponse.json({ error: "Invalid upload." }, { status: 400 })
-  }
-
-  const file = formData.get("file")
-  const kind = formData.get("kind")
-  if (!(file instanceof File)) {
-    return NextResponse.json({ error: "No file provided." }, { status: 400 })
-  }
-  if (kind !== "avatar" && kind !== "banner") {
-    return NextResponse.json({ error: "Invalid image kind." }, { status: 400 })
-  }
-
-  const validationError = validateProfileImageFile(file)
-  if (validationError) {
-    return NextResponse.json({ error: validationError }, { status: 400 })
-  }
+  const body = (await request.json()) as HandleUploadBody
 
   try {
-    const blob = await put(
-      `profile/${session.user.id}/${kind}-${file.name}`,
-      file,
-      { access: "private", addRandomSuffix: true },
-    )
+    const jsonResponse = await handleUpload({
+      body,
+      request,
+      onBeforeGenerateToken: async (_pathname, clientPayload) => {
+        let kind = ""
+        let mime = ""
+        try {
+          const parsed = clientPayload ? JSON.parse(clientPayload) : null
+          kind = typeof parsed?.kind === "string" ? parsed.kind : ""
+          mime = typeof parsed?.mime === "string" ? parsed.mime : ""
+        } catch {
+          // fall through to the invalid-kind check below
+        }
+        if (kind !== "avatar" && kind !== "banner") {
+          throw new Error("Invalid image kind.")
+        }
+        if (!(ALLOWED_PROFILE_IMAGE_TYPES as readonly string[]).includes(mime)) {
+          throw new Error("Only JPEG, PNG, WebP, and GIF images are supported.")
+        }
 
-    return NextResponse.json({
-      url: `/api/media?pathname=${encodeURIComponent(blob.pathname)}`,
+        return {
+          allowedContentTypes: [mime],
+          maximumSizeInBytes: MAX_IMAGE_SIZE_BYTES,
+          addRandomSuffix: true,
+          tokenPayload: JSON.stringify({ userId: session.user.id, kind }),
+        }
+      },
     })
+
+    return NextResponse.json(jsonResponse)
   } catch (error) {
-    logActionError("uploadProfileImage", error, {
-      userId: session.user.id,
-      kind,
-    })
+    logActionError("uploadProfileImage", error, { userId: session.user.id })
     return NextResponse.json(
-      { error: "Upload failed. Please try again." },
-      { status: 500 },
+      { error: error instanceof Error ? error.message : "Upload failed. Please try again." },
+      { status: 400 },
     )
   }
 }
