@@ -1,7 +1,12 @@
 import { cache } from "react"
 import { and, desc, eq, notInArray, sql } from "drizzle-orm"
 import { db } from "@/lib/db"
-import { follows, user } from "@/lib/db/schema"
+import {
+  follows,
+  user,
+  type WorkflowStep,
+  type WorkExperience,
+} from "@/lib/db/schema"
 
 function excludeUsersCondition(excludeUserIds: Set<string>) {
   return excludeUserIds.size > 0 ? notInArray(user.id, [...excludeUserIds]) : undefined
@@ -22,6 +27,13 @@ export type ProfileUser = {
   bannerImage: string | null
   website: string | null
   location: string | null
+  profession: string | null
+  totalClients: number | null
+  totalProjects: number | null
+  yearsExperience: number | null
+  skills: string[] | null
+  workflow: WorkflowStep[] | null
+  workExperience: WorkExperience[] | null
   createdAt: Date
 }
 
@@ -34,6 +46,13 @@ const profileSelection = {
   bannerImage: user.bannerImage,
   website: user.website,
   location: user.location,
+  profession: user.profession,
+  totalClients: user.totalClients,
+  totalProjects: user.totalProjects,
+  yearsExperience: user.yearsExperience,
+  skills: user.skills,
+  workflow: user.workflow,
+  workExperience: user.workExperience,
   createdAt: user.createdAt,
 } as const
 

@@ -9,6 +9,23 @@ import {
 import type { MediaAttachment } from "@/lib/media"
 
 /**
+ * Structured professional-profile data stored as JSONB on the user row.
+ * These power the About page's career overview (skills, workflow,
+ * and work-history sections).
+ */
+export type WorkflowStep = {
+  title: string
+  description: string
+}
+
+export type WorkExperience = {
+  role: string
+  company: string
+  period: string
+  description: string
+}
+
+/**
  * Better Auth core tables. Column names are camelCase to match Better
  * Auth's defaults exactly — do not rename them. These were created via
  * the Neon MCP and mirrored here for type-safe queries.
@@ -24,6 +41,14 @@ export const user = pgTable("user", {
   bannerImage: text("bannerImage"),
   website: text("website"),
   location: text("location"),
+  // Professional profile — surfaced on the About page.
+  profession: text("profession"),
+  totalClients: integer("totalClients"),
+  totalProjects: integer("totalProjects"),
+  yearsExperience: integer("yearsExperience"),
+  skills: jsonb("skills").$type<string[]>().default([]),
+  workflow: jsonb("workflow").$type<WorkflowStep[]>().default([]),
+  workExperience: jsonb("workExperience").$type<WorkExperience[]>().default([]),
   createdAt: timestamp("createdAt").notNull().defaultNow(),
   updatedAt: timestamp("updatedAt").notNull().defaultNow(),
 })

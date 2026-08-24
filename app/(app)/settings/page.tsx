@@ -14,6 +14,7 @@ import {
   CardContent,
 } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
+import type { WorkflowStep, WorkExperience } from "@/lib/db/schema"
 
 export const metadata: Metadata = {
   title: "Settings",
@@ -29,6 +30,13 @@ export default async function SettingsPage() {
     website?: string | null
     location?: string | null
     bannerImage?: string | null
+    profession?: string | null
+    totalClients?: number | null
+    totalProjects?: number | null
+    yearsExperience?: number | null
+    skills?: string[] | null
+    workflow?: WorkflowStep[] | null
+    workExperience?: WorkExperience[] | null
   }
 
   return (
@@ -56,6 +64,13 @@ export default async function SettingsPage() {
                 bio: user.bio ?? null,
                 website: user.website ?? null,
                 location: user.location ?? null,
+                profession: user.profession ?? null,
+                totalClients: user.totalClients ?? null,
+                totalProjects: user.totalProjects ?? null,
+                yearsExperience: user.yearsExperience ?? null,
+                skills: user.skills ?? [],
+                workflow: user.workflow ?? [],
+                workExperience: user.workExperience ?? [],
               }}
             />
           </CardContent>
