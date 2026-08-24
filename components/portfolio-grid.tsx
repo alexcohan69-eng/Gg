@@ -36,7 +36,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Spinner } from "@/components/ui/spinner"
 
-const MAX_PROJECTS = 30
+export const MAX_PROJECTS = 30
 
 function OwnerProjectTile({
   project,

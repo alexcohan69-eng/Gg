@@ -11,6 +11,7 @@ import { BackButton } from "@/components/back-button"
 import { ProfileHeader } from "@/components/profile-header"
 import { ProfileTabs } from "@/components/profile-tabs"
 import { PortfolioGrid } from "@/components/portfolio-grid"
+import { WorkAddButton } from "@/components/work-add-button"
 
 export async function generateMetadata({
   params,
@@ -65,6 +66,7 @@ export default async function ProfileWorkPage({
         name={profile.name}
         username={profile.username ?? "user"}
         leading={<BackButton />}
+        trailing={isSelf ? <WorkAddButton projectCount={projects.length} /> : null}
       />
 
       <ProfileHeader

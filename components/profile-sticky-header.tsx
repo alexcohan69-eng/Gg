@@ -29,10 +29,12 @@ export function ProfileStickyHeader({
   name,
   username,
   leading,
+  trailing,
 }: {
   name: string
   username: string
   leading?: React.ReactNode
+  trailing?: React.ReactNode
 }) {
   const [revealed, setRevealed] = useState(false)
   const headerRef = useRef<HTMLElement>(null)
@@ -89,6 +91,7 @@ export function ProfileStickyHeader({
           <p className="mt-0.5 text-sm text-muted-foreground">@{username}</p>
         </div>
       </div>
+      {trailing}
     </header>
   )
 }
