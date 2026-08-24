@@ -17,11 +17,12 @@ import {
   sanitizePostHtml,
 } from "@/lib/sanitize-html"
 import {
-  MAX_MEDIA_PER_POST,
-  mediaUrlToPathname,
-  validateMediaAttachments,
-  type MediaAttachment,
-  type MediaType,
+ MAX_MEDIA_PER_POST,
+ mediaUrlToPathname,
+ parseMediaColumn,
+ validateMediaAttachments,
+ type MediaAttachment,
+ type MediaType,
 } from "@/lib/media"
 
 async function getUserId() {
@@ -135,7 +136,8 @@ export async function createPost(
       id: postId,
       userId,
       content,
-      media,
+      // JSON-encoded TEXT — Aurora DSQL has no JSON/JSONB column type.
+      media: media.length > 0 ? JSON.stringify(media) : null,
       replyToId,
       isReply: Boolean(replyToId),
     })
@@ -197,7 +199,7 @@ export async function deletePost(postId: string): Promise<PostActionResult> {
 
   // Best-effort cleanup of the post's uploaded media. A failure here
   // shouldn't fail the delete — the post row is already gone.
-  const pathnames = (deleted.media ?? [])
+  const pathnames = parseMediaColumn(deleted.media)
     .map((item) => mediaUrlToPathname(item.url))
     .filter((p): p is string => p !== null)
 

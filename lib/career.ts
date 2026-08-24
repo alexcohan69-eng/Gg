@@ -44,8 +44,24 @@ export async function getCareerProfile(userId: string): Promise<CareerProfile> {
     yearsExperience: row.yearsExperience,
     totalClients: row.totalClients,
     totalProjects: row.totalProjects,
-    skills: row.skills ?? [],
-    workflowSteps: row.workflowSteps ?? [],
+    skills: parseJsonArray<string>(row.skills),
+    workflowSteps: parseJsonArray<WorkflowStep>(row.workflowSteps),
+  }
+}
+
+/**
+ * `skills` and `workflowSteps` are stored as JSON-encoded TEXT (Aurora
+ * DSQL has no JSON/JSONB column type) — parse defensively so a null,
+ * missing, or (in principle) malformed value falls back to an empty
+ * list instead of throwing.
+ */
+function parseJsonArray<T>(value: string | null): T[] {
+  if (!value) return []
+  try {
+    const parsed = JSON.parse(value)
+    return Array.isArray(parsed) ? (parsed as T[]) : []
+  } catch {
+    return []
   }
 }
 
