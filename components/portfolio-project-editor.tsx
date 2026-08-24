@@ -23,12 +23,33 @@ import { Spinner } from "@/components/ui/spinner"
 import {
   ALLOWED_MEDIA_TYPES,
   MAX_GALLERY_ITEMS,
+  MAX_VIDEO_SIZE_BYTES,
+  getMediaTypeForMime,
   validateMediaFile,
   validateProfileImageFile,
   type MediaAttachment,
   type MediaType,
 } from "@/lib/media"
+import { prepareVideoForUpload } from "@/lib/video-processing"
 import { cn } from "@/lib/utils"
+
+/**
+ * Runs any video file through prepareVideoForUpload (always strips
+ * audio; compresses if still over the cap) before it's validated and
+ * uploaded. Images/GIFs pass through untouched. A shared toast id is
+ * used so cover + gallery pickers never show overlapping progress
+ * toasts.
+ */
+async function preparePortfolioFile(file: File, toastId: string): Promise<File> {
+  if (getMediaTypeForMime(file.type) !== "video") return file
+  try {
+    return await prepareVideoForUpload(file, MAX_VIDEO_SIZE_BYTES, (_stage, label) => {
+      toast.loading(label, { id: toastId })
+    })
+  } finally {
+    toast.dismiss(toastId)
+  }
+}
 
 const MAX_TAGS = 6
 
@@ -61,15 +82,32 @@ function CoverMediaPicker({
   const [uploading, setUploading] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  function handleSelect(file: File | undefined) {
+  async function handleSelect(file: File | undefined) {
     if (!file) return
-    const validationError = validateMediaFile(file)
-    if (validationError) {
-      toast.error(validationError)
+    const mediaType = getMediaTypeForMime(file.type)
+    if (!mediaType) {
+      toast.error("Only JPEG, PNG, WebP, GIF images and MP4, WebM, or MOV videos are supported.")
       return
     }
+
     setUploading(true)
-    uploadPortfolioMedia(file, "cover")
+    let preparedFile: File
+    try {
+      preparedFile = await preparePortfolioFile(file, "cover-video-processing")
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Couldn't process video.")
+      setUploading(false)
+      return
+    }
+
+    const validationError = validateMediaFile(preparedFile)
+    if (validationError) {
+      toast.error(validationError)
+      setUploading(false)
+      return
+    }
+
+    uploadPortfolioMedia(preparedFile, "cover")
       .then(onChange)
       .catch((error: Error) => toast.error(error.message || "Upload failed."))
       .finally(() => setUploading(false))
@@ -81,7 +119,16 @@ function CoverMediaPicker({
       <div className="relative h-36 w-full overflow-hidden rounded-lg border border-dashed border-input bg-muted">
         {value ? (
           value.type === "video" ? (
-            <video src={value.url} muted playsInline preload="metadata" className="size-full object-cover" />
+            <video
+              src={value.url}
+              autoPlay
+              loop
+              muted
+              playsInline
+              disablePictureInPicture
+              preload="auto"
+              className="size-full object-cover"
+            />
           ) : (
             <Image src={value.url} alt="Cover" fill unoptimized className="object-cover" />
           )
@@ -148,7 +195,7 @@ function GalleryPicker({
   const [uploading, setUploading] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  function handleSelect(files: FileList | null) {
+  async function handleSelect(files: FileList | null) {
     if (!files || files.length === 0) return
     const incoming = Array.from(files)
     const remaining = MAX_GALLERY_ITEMS - value.length
@@ -161,22 +208,51 @@ function GalleryPicker({
       toast.error(`Only added the first ${toUpload.length} — the gallery is capped at ${MAX_GALLERY_ITEMS} items.`)
     }
 
-    const validFiles: File[] = []
+    const candidates: File[] = []
     for (const file of toUpload) {
-      const validationError = validateMediaFile(file)
-      if (validationError) {
-        toast.error(validationError)
+      const mediaType = getMediaTypeForMime(file.type)
+      if (!mediaType) {
+        toast.error("Only JPEG, PNG, WebP, GIF images and MP4, WebM, or MOV videos are supported.")
         continue
       }
-      validFiles.push(file)
+      candidates.push(file)
     }
-    if (validFiles.length === 0) return
+    if (candidates.length === 0) return
 
     setUploading(true)
+
+    // Videos are processed one at a time (they share a single
+    // ffmpeg.wasm instance, so running them concurrently would race
+    // on its virtual filesystem) before the whole batch is validated
+    // and uploaded together.
+    const validFiles: File[] = []
+    let processingFailures = 0
+    for (const file of candidates) {
+      let preparedFile: File
+      try {
+        preparedFile = await preparePortfolioFile(file, "gallery-video-processing")
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Couldn't process video.")
+        processingFailures += 1
+        continue
+      }
+      const validationError = validateMediaFile(preparedFile)
+      if (validationError) {
+        toast.error(validationError)
+        processingFailures += 1
+        continue
+      }
+      validFiles.push(preparedFile)
+    }
+    if (validFiles.length === 0) {
+      setUploading(false)
+      return
+    }
+
     Promise.allSettled(validFiles.map((file) => uploadPortfolioMedia(file, "gallery")))
       .then((results) => {
         const uploaded: MediaAttachment[] = []
-        let failures = 0
+        let failures = processingFailures
         for (const result of results) {
           if (result.status === "fulfilled") uploaded.push(result.value)
           else failures += 1

@@ -5,12 +5,14 @@ import { useRouter } from "next/navigation"
 import Image from "next/image"
 import { toast } from "sonner"
 import {
+  ExpandIcon,
   ExternalLinkIcon,
   ImageIcon,
   MoreHorizontalIcon,
   PencilIcon,
   PlayIcon,
   Trash2Icon,
+  VolumeXIcon,
 } from "lucide-react"
 import { deletePortfolioProject } from "@/app/actions/portfolio"
 import { sanitizePostHtml } from "@/lib/sanitize-html"
@@ -97,15 +99,22 @@ export function PortfolioProjectDetail({
             <>
               <video
                 src={project.coverImage}
+                autoPlay
+                loop
                 muted
                 playsInline
-                preload="metadata"
+                disablePictureInPicture
+                preload="auto"
                 className="size-full object-cover"
                 aria-hidden="true"
               />
-              <div className="absolute inset-0 flex items-center justify-center bg-black/10 transition-colors group-hover:bg-black/20">
-                <span className="flex size-12 items-center justify-center rounded-full bg-background/90 text-foreground shadow-sm">
-                  <PlayIcon className="size-5 fill-current" aria-hidden="true" />
+              <span className="absolute bottom-3 left-3 flex items-center gap-1 rounded bg-background/80 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-foreground backdrop-blur-sm">
+                <VolumeXIcon className="size-3" aria-hidden="true" />
+                Muted
+              </span>
+              <div className="absolute inset-0 flex items-center justify-center bg-black/0 opacity-0 transition-all group-hover:bg-black/20 group-hover:opacity-100">
+                <span className="flex size-11 items-center justify-center rounded-full bg-background/90 text-foreground shadow-sm">
+                  <ExpandIcon className="size-4" aria-hidden="true" />
                 </span>
               </div>
             </>

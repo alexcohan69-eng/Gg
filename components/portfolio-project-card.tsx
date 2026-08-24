@@ -1,6 +1,6 @@
 import Link from "next/link"
 import Image from "next/image"
-import { ArrowUpRightIcon, ImageIcon, PlayIcon } from "lucide-react"
+import { ArrowUpRightIcon, ImageIcon, VolumeXIcon } from "lucide-react"
 import type { PortfolioProject } from "@/lib/portfolio"
 import { Badge } from "@/components/ui/badge"
 
@@ -27,9 +27,12 @@ export function PortfolioProjectCard({
           project.coverImageType === "video" ? (
             <video
               src={project.coverImage}
+              autoPlay
+              loop
               muted
               playsInline
-              preload="metadata"
+              disablePictureInPicture
+              preload="auto"
               className="size-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.06]"
               aria-hidden="true"
             />
@@ -48,11 +51,10 @@ export function PortfolioProjectCard({
           </div>
         )}
         {project.coverImageType === "video" ? (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/10">
-            <span className="flex size-9 items-center justify-center rounded-full bg-background/90 text-foreground shadow-sm">
-              <PlayIcon className="size-4 fill-current" aria-hidden="true" />
-            </span>
-          </div>
+          <span className="absolute bottom-2 left-2 flex items-center gap-1 rounded bg-background/80 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-foreground backdrop-blur-sm">
+            <VolumeXIcon className="size-3" aria-hidden="true" />
+            Muted
+          </span>
         ) : project.coverImageType === "gif" ? (
           <span className="absolute bottom-2 left-2 rounded bg-background/80 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-foreground backdrop-blur-sm">
             GIF
