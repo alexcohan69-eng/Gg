@@ -197,6 +197,12 @@
     & strong {
       @apply font-semibold;
     }
+    /* Inline images inserted via the portfolio case-study editor's
+       "Insert image" toolbar button (see rich-text-editor.tsx's
+       optional Tiptap Image extension). */
+    & img {
+      @apply my-3 max-w-full rounded-lg border border-border;
+    }
     /* Tiptap's Placeholder extension puts `is-editor-empty` on the first
        empty node (the paragraph), not on the editor root, so this has to
        be a descendant selector rather than `&.is-editor-empty`. */

@@ -127,6 +127,27 @@ export function validateImageFile(file: {
 }
 
 /**
+ * Portfolio case studies allow more media than a single post (a cover
+ * plus a gallery), and — unlike posts — videos can be mixed freely
+ * with images/GIFs in the gallery, so `validateMediaAttachments`
+ * (post-specific: one video, never combined) doesn't apply here.
+ */
+export const MAX_GALLERY_ITEMS = 12
+export const MAX_GALLERY_VIDEOS = 4
+
+/** Validates a portfolio project's full gallery set (server-side, in the portfolio actions). */
+export function validateGalleryMedia(media: MediaAttachment[]): string | null {
+  if (media.length > MAX_GALLERY_ITEMS) {
+    return `You can add up to ${MAX_GALLERY_ITEMS} gallery items.`
+  }
+  const videoCount = media.filter((m) => m.type === "video").length
+  if (videoCount > MAX_GALLERY_VIDEOS) {
+    return `You can add up to ${MAX_GALLERY_VIDEOS} videos in the gallery.`
+  }
+  return null
+}
+
+/**
  * Recovers the Blob pathname (e.g. "posts/<userId>/<file>") from one of
  * our own /api/media delivery URLs, so callers that only have the
  * public-facing URL (createPost's own cleanup, and the admin

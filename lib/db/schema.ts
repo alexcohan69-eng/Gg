@@ -207,10 +207,19 @@ export const portfolioProjects = pgTable("portfolioProjects", {
   title: text("title").notNull(),
   tagline: text("tagline").notNull(),
   coverImage: text("coverImage"),
+  // "image" | "gif" | "video" (see lib/media.ts MediaType). Null for
+  // rows written before video/GIF covers existed — treated as "image"
+  // by the app layer (see lib/portfolio.ts) since every legacy cover
+  // is one.
+  coverImageType: text("coverImageType"),
   client: text("client"),
   externalUrl: text("externalUrl"),
   tags: text("tags"),
   description: text("description"),
+  // JSON-encoded TEXT array of `{ url, type }` MediaAttachment objects
+  // (Aurora DSQL has no JSON/array column types) — see lib/portfolio.ts.
+  // Older rows may still be a plain string[] of URLs; parsed
+  // defensively for backward compatibility.
   gallery: text("gallery"),
   sortOrder: integer("sortOrder").notNull().default(0),
   createdAt: timestamp("createdAt").notNull().defaultNow(),

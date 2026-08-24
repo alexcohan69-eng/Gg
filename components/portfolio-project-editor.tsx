@@ -3,7 +3,7 @@
 import { useRef, useState, useTransition } from "react"
 import Image from "next/image"
 import { toast } from "sonner"
-import { CameraIcon, ImagePlusIcon, XIcon } from "lucide-react"
+import { CameraIcon, ImagePlusIcon, PlayIcon, XIcon } from "lucide-react"
 import { addPortfolioProject, updatePortfolioProject } from "@/app/actions/portfolio"
 import type { PortfolioProject } from "@/lib/portfolio"
 import { useRichTextEditor, RichTextEditor, RichTextToolbar } from "@/components/rich-text-editor"
@@ -20,42 +20,56 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog"
 import { Spinner } from "@/components/ui/spinner"
-import { validateProfileImageFile } from "@/lib/media"
+import {
+  ALLOWED_MEDIA_TYPES,
+  MAX_GALLERY_ITEMS,
+  validateMediaFile,
+  validateProfileImageFile,
+  type MediaAttachment,
+  type MediaType,
+} from "@/lib/media"
 import { cn } from "@/lib/utils"
 
 const MAX_TAGS = 6
-const MAX_GALLERY_IMAGES = 6
 
-/** Uploads a single file to /api/upload/portfolio and returns its proxy URL. */
-async function uploadPortfolioImage(file: File, kind: "cover" | "gallery"): Promise<string> {
+/** Accept attribute covering every image/GIF/video mime the upload route allows for cover/gallery. */
+const MEDIA_ACCEPT = ALLOWED_MEDIA_TYPES.join(",")
+/** Inline description images are stills only (see /api/upload/portfolio's "description" kind). */
+const DESCRIPTION_IMAGE_ACCEPT = "image/jpeg,image/png,image/webp,image/gif"
+
+/** Uploads a single file to /api/upload/portfolio and returns its proxy URL + resolved media type. */
+async function uploadPortfolioMedia(
+  file: File,
+  kind: "cover" | "gallery" | "description",
+): Promise<MediaAttachment> {
   const body = new FormData()
   body.set("file", file)
   body.set("kind", kind)
   const res = await fetch("/api/upload/portfolio", { method: "POST", body })
   const data = await res.json()
   if (!res.ok) throw new Error(data.error ?? "Upload failed.")
-  return data.url as string
+  return { url: data.url as string, type: (data.type as MediaType) ?? "image" }
 }
 
-function CoverImagePicker({
+function CoverMediaPicker({
   value,
   onChange,
 }: {
-  value: string | null
-  onChange: (url: string | null) => void
+  value: MediaAttachment | null
+  onChange: (media: MediaAttachment | null) => void
 }) {
   const [uploading, setUploading] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
   function handleSelect(file: File | undefined) {
     if (!file) return
-    const validationError = validateProfileImageFile(file)
+    const validationError = validateMediaFile(file)
     if (validationError) {
       toast.error(validationError)
       return
     }
     setUploading(true)
-    uploadPortfolioImage(file, "cover")
+    uploadPortfolioMedia(file, "cover")
       .then(onChange)
       .catch((error: Error) => toast.error(error.message || "Upload failed."))
       .finally(() => setUploading(false))
@@ -63,14 +77,23 @@ function CoverImagePicker({
 
   return (
     <Field>
-      <FieldLabel>Cover image</FieldLabel>
+      <FieldLabel>Cover image or video</FieldLabel>
       <div className="relative h-36 w-full overflow-hidden rounded-lg border border-dashed border-input bg-muted">
         {value ? (
-          <Image src={value} alt="Cover" fill unoptimized className="object-cover" />
+          value.type === "video" ? (
+            <video src={value.url} muted playsInline preload="metadata" className="size-full object-cover" />
+          ) : (
+            <Image src={value.url} alt="Cover" fill unoptimized className="object-cover" />
+          )
+        ) : null}
+        {value?.type === "video" ? (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/10">
+            <PlayIcon className="size-6 fill-background text-background" aria-hidden="true" />
+          </div>
         ) : null}
         <div className="absolute inset-0 flex items-center justify-center gap-2">
           {!value ? (
-            <p className="text-sm text-muted-foreground">No cover image yet</p>
+            <p className="text-sm text-muted-foreground">No cover media yet</p>
           ) : null}
         </div>
         <div className="absolute right-2 bottom-2 flex gap-2">
@@ -82,7 +105,7 @@ function CoverImagePicker({
               className="rounded-full"
               disabled={uploading}
               onClick={() => onChange(null)}
-              aria-label="Remove cover image"
+              aria-label="Remove cover media"
             >
               <XIcon className="size-4" />
             </Button>
@@ -94,7 +117,7 @@ function CoverImagePicker({
             className="rounded-full"
             disabled={uploading}
             onClick={() => inputRef.current?.click()}
-            aria-label="Upload cover image"
+            aria-label="Upload cover image or video"
           >
             {uploading ? <Spinner /> : <CameraIcon className="size-4" />}
           </Button>
@@ -103,13 +126,14 @@ function CoverImagePicker({
       <input
         ref={inputRef}
         type="file"
-        accept="image/jpeg,image/png,image/webp,image/gif"
+        accept={MEDIA_ACCEPT}
         className="sr-only"
         onChange={(e) => {
           handleSelect(e.target.files?.[0])
           e.target.value = ""
         }}
       />
+      <FieldDescription>Image, GIF, or video — shown as the banner for this case study.</FieldDescription>
     </Field>
   )
 }
@@ -118,27 +142,48 @@ function GalleryPicker({
   value,
   onChange,
 }: {
-  value: string[]
-  onChange: (urls: string[]) => void
+  value: MediaAttachment[]
+  onChange: (media: MediaAttachment[]) => void
 }) {
   const [uploading, setUploading] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  function handleSelect(file: File | undefined) {
-    if (!file) return
-    if (value.length >= MAX_GALLERY_IMAGES) {
-      toast.error(`You can add up to ${MAX_GALLERY_IMAGES} gallery images.`)
+  function handleSelect(files: FileList | null) {
+    if (!files || files.length === 0) return
+    const incoming = Array.from(files)
+    const remaining = MAX_GALLERY_ITEMS - value.length
+    if (remaining <= 0) {
+      toast.error(`You can add up to ${MAX_GALLERY_ITEMS} gallery items.`)
       return
     }
-    const validationError = validateProfileImageFile(file)
-    if (validationError) {
-      toast.error(validationError)
-      return
+    const toUpload = incoming.slice(0, remaining)
+    if (incoming.length > toUpload.length) {
+      toast.error(`Only added the first ${toUpload.length} — the gallery is capped at ${MAX_GALLERY_ITEMS} items.`)
     }
+
+    const validFiles: File[] = []
+    for (const file of toUpload) {
+      const validationError = validateMediaFile(file)
+      if (validationError) {
+        toast.error(validationError)
+        continue
+      }
+      validFiles.push(file)
+    }
+    if (validFiles.length === 0) return
+
     setUploading(true)
-    uploadPortfolioImage(file, "gallery")
-      .then((url) => onChange([...value, url]))
-      .catch((error: Error) => toast.error(error.message || "Upload failed."))
+    Promise.allSettled(validFiles.map((file) => uploadPortfolioMedia(file, "gallery")))
+      .then((results) => {
+        const uploaded: MediaAttachment[] = []
+        let failures = 0
+        for (const result of results) {
+          if (result.status === "fulfilled") uploaded.push(result.value)
+          else failures += 1
+        }
+        if (uploaded.length > 0) onChange([...value, ...uploaded])
+        if (failures > 0) toast.error(`${failures} file${failures > 1 ? "s" : ""} failed to upload.`)
+      })
       .finally(() => setUploading(false))
   }
 
@@ -146,20 +191,29 @@ function GalleryPicker({
     <Field>
       <FieldLabel>Gallery</FieldLabel>
       <div className="grid grid-cols-3 gap-2">
-        {value.map((url, index) => (
-          <div key={url} className="group relative aspect-square overflow-hidden rounded-lg bg-muted">
-            <Image src={url} alt={`Gallery image ${index + 1}`} fill unoptimized className="object-cover" />
+        {value.map((item, index) => (
+          <div key={item.url} className="group relative aspect-square overflow-hidden rounded-lg bg-muted">
+            {item.type === "video" ? (
+              <>
+                <video src={item.url} muted playsInline preload="metadata" className="size-full object-cover" />
+                <div className="absolute inset-0 flex items-center justify-center bg-black/10">
+                  <PlayIcon className="size-4 fill-background text-background" aria-hidden="true" />
+                </div>
+              </>
+            ) : (
+              <Image src={item.url} alt={`Gallery item ${index + 1}`} fill unoptimized className="object-cover" />
+            )}
             <button
               type="button"
-              onClick={() => onChange(value.filter((u) => u !== url))}
-              aria-label="Remove gallery image"
+              onClick={() => onChange(value.filter((v) => v.url !== item.url))}
+              aria-label="Remove gallery item"
               className="absolute right-1 top-1 rounded-full bg-background/80 p-1 text-foreground opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
             >
               <XIcon className="size-3" aria-hidden="true" />
             </button>
           </div>
         ))}
-        {value.length < MAX_GALLERY_IMAGES ? (
+        {value.length < MAX_GALLERY_ITEMS ? (
           <button
             type="button"
             onClick={() => inputRef.current?.click()}
@@ -174,15 +228,17 @@ function GalleryPicker({
       <input
         ref={inputRef}
         type="file"
-        accept="image/jpeg,image/png,image/webp,image/gif"
+        accept={MEDIA_ACCEPT}
+        multiple
         className="sr-only"
         onChange={(e) => {
-          handleSelect(e.target.files?.[0])
+          handleSelect(e.target.files)
           e.target.value = ""
         }}
       />
       <FieldDescription>
-        Optional — up to {MAX_GALLERY_IMAGES} images to show alongside your case study.
+        Optional — up to {MAX_GALLERY_ITEMS} images, GIFs, or videos. Select multiple files at once to add them
+        together.
       </FieldDescription>
     </Field>
   )
@@ -259,14 +315,19 @@ export function PortfolioProjectDialog({
   project?: PortfolioProject
   onSaved: () => void
 }) {
-  const [coverImage, setCoverImage] = useState<string | null>(project?.coverImage ?? null)
-  const [gallery, setGallery] = useState<string[]>(project?.gallery ?? [])
+  const [coverMedia, setCoverMedia] = useState<MediaAttachment | null>(
+    project?.coverImage ? { url: project.coverImage, type: project.coverImageType } : null,
+  )
+  const [gallery, setGallery] = useState<MediaAttachment[]>(project?.gallery ?? [])
   const [tags, setTags] = useState<string[]>(project?.tags ?? [])
   const [error, setError] = useState<string | null>(null)
+  const [insertingImage, setInsertingImage] = useState(false)
   const [isPending, startTransition] = useTransition()
+  const descriptionImageInputRef = useRef<HTMLInputElement>(null)
 
   const editor = useRichTextEditor({
     placeholder: "Tell the story behind this project — the goal, your approach, the outcome...",
+    images: true,
   })
   const [hasHydrated, setHasHydrated] = useState(false)
   if (editor && !hasHydrated) {
@@ -274,12 +335,29 @@ export function PortfolioProjectDialog({
     setHasHydrated(true)
   }
 
+  function handleInsertDescriptionImage(file: File | undefined) {
+    if (!file || !editor) return
+    const validationError = validateProfileImageFile(file)
+    if (validationError) {
+      toast.error(validationError)
+      return
+    }
+    setInsertingImage(true)
+    uploadPortfolioMedia(file, "description")
+      .then((media) => {
+        editor.chain().focus().setImage({ src: media.url, alt: "" }).run()
+      })
+      .catch((error: Error) => toast.error(error.message || "Upload failed."))
+      .finally(() => setInsertingImage(false))
+  }
+
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setError(null)
 
     const formData = new FormData(e.currentTarget)
-    formData.set("coverImage", coverImage ?? "")
+    formData.set("coverImage", coverMedia?.url ?? "")
+    formData.set("coverImageType", coverMedia?.type ?? "")
     formData.set("gallery", JSON.stringify(gallery))
     formData.set("tags", JSON.stringify(tags))
     formData.set("description", editor?.getHTML() ?? "")
@@ -314,7 +392,7 @@ export function PortfolioProjectDialog({
 
         <form key={project?.id ?? "new"} onSubmit={handleSubmit} className="flex flex-col gap-4">
           <FieldGroup>
-            <CoverImagePicker value={coverImage} onChange={setCoverImage} />
+            <CoverMediaPicker value={coverMedia} onChange={setCoverMedia} />
 
             <Field>
               <FieldLabel htmlFor="title">Title</FieldLabel>
@@ -367,9 +445,27 @@ export function PortfolioProjectDialog({
                 )}
               >
                 <RichTextEditor editor={editor} className="px-3 pt-3" />
-                <RichTextToolbar editor={editor} className="border-t px-2 py-1.5" />
+                <RichTextToolbar
+                  editor={editor}
+                  className="border-t px-2 py-1.5"
+                  onInsertImage={() => descriptionImageInputRef.current?.click()}
+                  insertingImage={insertingImage}
+                />
               </div>
-              <FieldDescription>Optional — the full story behind the project.</FieldDescription>
+              <input
+                ref={descriptionImageInputRef}
+                type="file"
+                accept={DESCRIPTION_IMAGE_ACCEPT}
+                className="sr-only"
+                onChange={(e) => {
+                  handleInsertDescriptionImage(e.target.files?.[0])
+                  e.target.value = ""
+                }}
+              />
+              <FieldDescription>
+                Optional — the full story behind the project. Use the image button in the toolbar to drop a photo
+                anywhere in the text.
+              </FieldDescription>
             </Field>
 
             <GalleryPicker value={gallery} onChange={setGallery} />
