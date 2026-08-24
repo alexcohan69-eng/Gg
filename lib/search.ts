@@ -47,6 +47,7 @@ export async function searchUsers(
       name: user.name,
       username: user.username,
       bio: user.bio,
+      about: user.about,
       image: user.image,
       bannerImage: user.bannerImage,
       website: user.website,
