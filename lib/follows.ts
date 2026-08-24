@@ -18,6 +18,7 @@ export type ProfileUser = {
   name: string
   username: string | null
   bio: string | null
+  about: string | null
   image: string | null
   bannerImage: string | null
   website: string | null
@@ -30,6 +31,7 @@ const profileSelection = {
   name: user.name,
   username: user.username,
   bio: user.bio,
+  about: user.about,
   image: user.image,
   bannerImage: user.bannerImage,
   website: user.website,

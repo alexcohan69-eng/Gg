@@ -6,6 +6,7 @@ import { eq } from "drizzle-orm"
 import { getSessionWithRetry } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { user as userTable } from "@/lib/db/schema"
+import { getPostTextLength, sanitizePostHtml } from "@/lib/sanitize-html"
 
 async function getUserId() {
   const session = await getSessionWithRetry({ headers: await headers() })
@@ -74,6 +75,41 @@ export async function updateProfile(
       bio: bio || null,
       website: website || null,
       location: location || null,
+      updatedAt: new Date(),
+    })
+    .where(eq(userTable.id, userId))
+
+  revalidatePath("/profile")
+  revalidatePath("/settings")
+
+  return { success: true }
+}
+
+const MAX_ABOUT_LENGTH = 4000
+
+/**
+ * Persists the rich-text "About" section shown on the profile's About
+ * tab. Kept separate from `bio` (the short one-line intro in the
+ * profile header) — this is the longer, formatted write-up and is
+ * sanitized the same way post content is before it's stored.
+ */
+export async function updateAbout(html: string): Promise<UpdateProfileResult> {
+  const userId = await getUserId()
+
+  const sanitized = sanitizePostHtml(html)
+  const isEmpty = getPostTextLength(sanitized) === 0
+
+  if (!isEmpty && getPostTextLength(sanitized) > MAX_ABOUT_LENGTH) {
+    return {
+      success: false,
+      error: `About section must be ${MAX_ABOUT_LENGTH} characters or fewer.`,
+    }
+  }
+
+  await db
+    .update(userTable)
+    .set({
+      about: isEmpty ? null : sanitized,
       updatedAt: new Date(),
     })
     .where(eq(userTable.id, userId))
