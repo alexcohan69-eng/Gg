@@ -1,4 +1,4 @@
-import DOMPurify from "isomorphic-dompurify"
+import sanitizeHtml from "sanitize-html"
 
 /**
  * Tags/attributes allowed in rich-text post content. Kept intentionally
@@ -6,6 +6,12 @@ import DOMPurify from "isomorphic-dompurify"
  * italic, strike, links, lists, quote, inline/code block) — so a
  * crafted request can't smuggle in scripts, styles, or arbitrary
  * attributes via the "content" field.
+ *
+ * Uses the `sanitize-html` package (pure JS, no jsdom) rather than
+ * isomorphic-dompurify: jsdom's dependency chain (html-encoding-sniffer
+ * -> @exodus/bytes) ships an ESM-only file that Turbopack's serverless
+ * bundle can't require(), which crashed every page that touched post
+ * content in production.
  */
 const ALLOWED_TAGS = [
   "p",
@@ -32,10 +38,18 @@ const ALLOWED_ATTR = ["href", "target", "rel"]
  * dangerouslySetInnerHTML call.
  */
 export function sanitizePostHtml(html: string): string {
-  return DOMPurify.sanitize(html, {
-    ALLOWED_TAGS,
-    ALLOWED_ATTR,
-    ALLOW_DATA_ATTR: false,
+  return sanitizeHtml(html, {
+    allowedTags: ALLOWED_TAGS,
+    allowedAttributes: {
+      a: ALLOWED_ATTR,
+    },
+    // Force safe defaults on links regardless of what the client sent.
+    transformTags: {
+      a: sanitizeHtml.simpleTransform("a", {
+        target: "_blank",
+        rel: "noopener noreferrer nofollow ugc",
+      }),
+    },
   }).trim()
 }
 
@@ -44,7 +58,7 @@ export function sanitizePostHtml(html: string): string {
  * plain text — metadata excerpts, moderation previews, list snippets.
  */
 export function stripHtmlToText(html: string): string {
-  return DOMPurify.sanitize(html, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] })
+  return sanitizeHtml(html, { allowedTags: [], allowedAttributes: {} })
     .replace(/\s+/g, " ")
     .trim()
 }
