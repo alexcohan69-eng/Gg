@@ -24,6 +24,11 @@ export const user = pgTable("user", {
   bannerImage: text("bannerImage"),
   website: text("website"),
   location: text("location"),
+  // Long-form rich-text "About" section shown on the About page.
+  // Separate from `bio` (the short one-line intro used in the header
+  // and card previews) — this is sanitized HTML from the same
+  // rich-text editor used by the post composer.
+  about: text("about"),
   // Career overview fields shown on the About page. All optional —
   // profiles that haven't filled these in fall back to empty states.
   yearsExperience: integer("yearsExperience"),

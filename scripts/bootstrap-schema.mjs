@@ -93,6 +93,9 @@ const statements = [
   // client/project totals, skills, workflow). Added via ALTER TABLE
   // rather than being in the CREATE TABLE above since "user" already
   // existed in prior environments before this feature.
+  // Long-form rich-text About section (separate from the short "bio"
+  // field, which predates this and is used in the header/card previews).
+  `alter table "user" add column if not exists "about" text`,
   `alter table "user" add column if not exists "yearsExperience" integer`,
   `alter table "user" add column if not exists "totalClients" integer`,
   `alter table "user" add column if not exists "totalProjects" integer`,
