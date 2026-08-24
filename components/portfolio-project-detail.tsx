@@ -4,13 +4,25 @@ import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
 import { toast } from "sonner"
-import { ExternalLinkIcon, ImageIcon, PencilIcon, Trash2Icon } from "lucide-react"
+import {
+  ExternalLinkIcon,
+  ImageIcon,
+  MoreHorizontalIcon,
+  PencilIcon,
+  Trash2Icon,
+} from "lucide-react"
 import { deletePortfolioProject } from "@/app/actions/portfolio"
 import { sanitizePostHtml } from "@/lib/sanitize-html"
 import type { PortfolioProject } from "@/lib/portfolio"
 import { PortfolioProjectDialog } from "@/components/portfolio-project-editor"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import {
   AlertDialog,
   AlertDialogContent,
@@ -59,6 +71,8 @@ export function PortfolioProjectDetail({
   // sanitizes at write time).
   const descriptionHtml = project.description ? sanitizePostHtml(project.description) : null
 
+  const hasMeta = project.client || project.externalUrl || project.tags.length > 0
+
   return (
     <div className="flex flex-col">
       <div className="relative aspect-video w-full bg-muted">
@@ -68,6 +82,7 @@ export function PortfolioProjectDetail({
             alt={`Cover image for ${project.title}`}
             fill
             unoptimized
+            priority
             className="object-cover"
           />
         ) : (
@@ -77,62 +92,80 @@ export function PortfolioProjectDetail({
         )}
       </div>
 
-      <div className="flex flex-col gap-4 p-4">
+      <div className="flex flex-col gap-6 p-4 pb-10">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <h1 className="font-heading text-2xl font-semibold tracking-tight text-foreground text-balance">
+            <p className="text-xs font-medium tracking-wide text-primary uppercase">Case study</p>
+            <h1 className="mt-1 font-heading text-2xl font-semibold tracking-tight text-foreground text-balance">
               {project.title}
             </h1>
-            <p className="mt-1 text-base text-muted-foreground text-pretty">{project.tagline}</p>
+            <p className="mt-1.5 text-base text-muted-foreground text-pretty">{project.tagline}</p>
           </div>
           {isSelf ? (
-            <div className="flex shrink-0 gap-1">
-              <Button
-                type="button"
-                variant="outline"
-                size="icon-sm"
-                onClick={() => setEditOpen(true)}
-                aria-label="Edit project"
-              >
-                <PencilIcon />
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="icon-sm"
-                className="text-destructive hover:text-destructive"
-                onClick={() => setDeleteOpen(true)}
-                aria-label="Delete project"
-              >
-                <Trash2Icon />
-              </Button>
-            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon-sm"
+                    className="shrink-0 rounded-full"
+                    aria-label="Project options"
+                  >
+                    <MoreHorizontalIcon />
+                  </Button>
+                }
+              />
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setEditOpen(true)}>
+                  <PencilIcon data-icon="inline-start" />
+                  Edit project
+                </DropdownMenuItem>
+                <DropdownMenuItem variant="destructive" onClick={() => setDeleteOpen(true)}>
+                  <Trash2Icon data-icon="inline-start" />
+                  Delete project
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           ) : null}
         </div>
 
-        {(project.client || project.externalUrl || project.tags.length > 0) && (
-          <div className="flex flex-wrap items-center gap-2">
+        {hasMeta ? (
+          <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card/60 p-4">
             {project.client ? (
-              <Badge variant="secondary">Client: {project.client}</Badge>
+              <div className="flex items-center justify-between gap-4 text-sm">
+                <span className="text-muted-foreground">Client</span>
+                <span className="font-medium text-foreground">{project.client}</span>
+              </div>
             ) : null}
-            {project.tags.map((tag) => (
-              <Badge key={tag} variant="secondary">
-                {tag}
-              </Badge>
-            ))}
+            {project.tags.length > 0 ? (
+              <div className="flex items-center justify-between gap-4 text-sm">
+                <span className="shrink-0 text-muted-foreground">Focus</span>
+                <div className="flex flex-wrap justify-end gap-1.5">
+                  {project.tags.map((tag) => (
+                    <Badge key={tag} variant="secondary">
+                      {tag}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            ) : null}
             {project.externalUrl ? (
-              <a
-                href={project.externalUrl}
-                target="_blank"
-                rel="noreferrer noopener"
-                className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
-              >
-                Visit project
-                <ExternalLinkIcon className="size-3.5" aria-hidden="true" />
-              </a>
+              <div className="flex items-center justify-between gap-4 text-sm">
+                <span className="text-muted-foreground">Link</span>
+                <a
+                  href={project.externalUrl}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="inline-flex items-center gap-1 font-medium text-primary hover:underline"
+                >
+                  Visit project
+                  <ExternalLinkIcon className="size-3.5" aria-hidden="true" />
+                </a>
+              </div>
             ) : null}
           </div>
-        )}
+        ) : null}
 
         {descriptionHtml ? (
           <div
@@ -142,18 +175,26 @@ export function PortfolioProjectDetail({
         ) : null}
 
         {project.gallery.length > 0 ? (
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-            {project.gallery.map((url, index) => (
-              <div key={url} className="relative aspect-square overflow-hidden rounded-lg bg-muted">
-                <Image
-                  src={url}
-                  alt={`Gallery image ${index + 1} for ${project.title}`}
-                  fill
-                  unoptimized
-                  className="object-cover"
-                />
-              </div>
-            ))}
+          <div className="flex flex-col gap-3">
+            <h2 className="font-heading text-sm font-semibold tracking-tight text-foreground">
+              Gallery
+            </h2>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {project.gallery.map((url, index) => (
+                <div
+                  key={url}
+                  className="relative aspect-square overflow-hidden rounded-xl border border-border bg-muted"
+                >
+                  <Image
+                    src={url}
+                    alt={`Gallery image ${index + 1} for ${project.title}`}
+                    fill
+                    unoptimized
+                    className="object-cover transition-transform duration-300 hover:scale-105"
+                  />
+                </div>
+              ))}
+            </div>
           </div>
         ) : null}
       </div>
