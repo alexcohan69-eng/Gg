@@ -2,9 +2,14 @@ import type { Metadata } from "next"
 import { headers } from "next/headers"
 import { redirect } from "next/navigation"
 import { getSessionWithRetry } from "@/lib/auth"
+import { getCareerProfile, getWorkExperience } from "@/lib/career"
 import { PageHeader } from "@/components/page-header"
 import { ProfileImageEditor } from "@/components/profile-image-editor"
 import { ProfileSettingsForm } from "@/components/profile-settings-form"
+import { CareerStatsForm } from "@/components/career-stats-form"
+import { SkillsEditor } from "@/components/skills-editor"
+import { WorkflowStepsEditor } from "@/components/workflow-steps-editor"
+import { WorkExperienceEditor } from "@/components/work-experience-editor"
 import { SignOutButton } from "@/components/sign-out-button"
 import {
   Card,
@@ -30,6 +35,11 @@ export default async function SettingsPage() {
     location?: string | null
     bannerImage?: string | null
   }
+
+  const [careerProfile, workExperience] = await Promise.all([
+    getCareerProfile(user.id),
+    getWorkExperience(user.id),
+  ])
 
   return (
     <div className="flex flex-col">
@@ -58,6 +68,54 @@ export default async function SettingsPage() {
                 location: user.location ?? null,
               }}
             />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Career highlights</CardTitle>
+            <CardDescription>
+              Shown as a metrics strip at the top of your About page.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <CareerStatsForm stats={careerProfile} />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Skills</CardTitle>
+            <CardDescription>
+              The expertise you want visitors to see first.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <SkillsEditor skills={careerProfile.skills} />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Workflow</CardTitle>
+            <CardDescription>
+              The steps you take clients through from kickoff to delivery.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <WorkflowStepsEditor steps={careerProfile.workflowSteps} />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Work experience</CardTitle>
+            <CardDescription>
+              Your career timeline, most recent role first.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <WorkExperienceEditor experience={workExperience} />
           </CardContent>
         </Card>
 

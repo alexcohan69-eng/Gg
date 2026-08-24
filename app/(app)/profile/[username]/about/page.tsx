@@ -5,8 +5,11 @@ import {
   ArrowUpRightIcon,
   AtSignIcon,
   BadgeCheckIcon,
+  BriefcaseIcon,
   CalendarIcon,
+  FolderCheckIcon,
   GlobeIcon,
+  ListChecksIcon,
   MailIcon,
   MapPinIcon,
   MessageSquareTextIcon,
@@ -14,6 +17,7 @@ import {
   UsersIcon,
 } from "lucide-react"
 import { getSessionWithRetry } from "@/lib/auth"
+import { getCareerProfile, getWorkExperience } from "@/lib/career"
 import { getFollowCounts, getProfileByIdentifier, isFollowing } from "@/lib/follows"
 import { getUserPostCount } from "@/lib/posts"
 import { getInitials, profileHref } from "@/lib/utils"
@@ -22,6 +26,7 @@ import { BackButton } from "@/components/back-button"
 import { FollowButton } from "@/components/follow-button"
 import { MessageButton } from "@/components/message-button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 
 export async function generateMetadata({
@@ -73,11 +78,37 @@ export default async function ProfileAboutPage({
 
   const isSelf = profile.id === session.user.id
 
-  const [postCount, followCounts, viewerFollows] = await Promise.all([
-    getUserPostCount(profile.id),
-    getFollowCounts(profile.id),
-    isSelf ? Promise.resolve(false) : isFollowing(session.user.id, profile.id),
-  ])
+  const [postCount, followCounts, viewerFollows, careerProfile, workExperience] =
+    await Promise.all([
+      getUserPostCount(profile.id),
+      getFollowCounts(profile.id),
+      isSelf ? Promise.resolve(false) : isFollowing(session.user.id, profile.id),
+      getCareerProfile(profile.id),
+      getWorkExperience(profile.id),
+    ])
+
+  const careerHighlights: { label: string; value: string; icon: typeof BriefcaseIcon }[] = []
+  if (careerProfile.yearsExperience != null) {
+    careerHighlights.push({
+      label: careerProfile.yearsExperience === 1 ? "Year of experience" : "Years of experience",
+      value: careerProfile.yearsExperience.toLocaleString(),
+      icon: BriefcaseIcon,
+    })
+  }
+  if (careerProfile.totalClients != null) {
+    careerHighlights.push({
+      label: careerProfile.totalClients === 1 ? "Client" : "Clients",
+      value: careerProfile.totalClients.toLocaleString(),
+      icon: UsersIcon,
+    })
+  }
+  if (careerProfile.totalProjects != null) {
+    careerHighlights.push({
+      label: careerProfile.totalProjects === 1 ? "Project" : "Projects",
+      value: careerProfile.totalProjects.toLocaleString(),
+      icon: FolderCheckIcon,
+    })
+  }
 
   const joinedFull = new Date(profile.createdAt).toLocaleDateString(undefined, {
     month: "long",
@@ -276,6 +307,191 @@ export default async function ProfileAboutPage({
             </Button>
           ) : null}
         </section>
+
+        {/* Career highlights — years of experience, clients, projects */}
+        {careerHighlights.length > 0 ? (
+          <section
+            aria-label="Career highlights"
+            className="grid grid-cols-3 gap-3"
+          >
+            {careerHighlights.map((stat) => {
+              const Icon = stat.icon
+              return (
+                <div
+                  key={stat.label}
+                  className="flex flex-col gap-2 rounded-xl border border-border bg-card p-4"
+                >
+                  <Icon className="size-4 text-muted-foreground" aria-hidden="true" />
+                  <span className="font-heading text-xl font-semibold tracking-tight text-foreground">
+                    {stat.value}
+                  </span>
+                  <span className="text-xs text-muted-foreground">{stat.label}</span>
+                </div>
+              )
+            })}
+          </section>
+        ) : isSelf ? (
+          <section className="rounded-2xl border border-dashed border-border bg-card/50 p-5">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Career highlights
+            </h3>
+            <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+              Add your years of experience, client count, and project count from
+              settings to show a metrics strip here.
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-4 rounded-full"
+              nativeButton={false}
+              render={<a href="/settings" />}
+            >
+              Add career highlights
+            </Button>
+          </section>
+        ) : null}
+
+        {/* Skills */}
+        {careerProfile.skills.length > 0 ? (
+          <section className="rounded-2xl border border-border bg-card p-5">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Skills
+            </h3>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {careerProfile.skills.map((skill) => (
+                <Badge key={skill} variant="secondary" className="rounded-full px-3 py-1">
+                  {skill}
+                </Badge>
+              ))}
+            </div>
+          </section>
+        ) : isSelf ? (
+          <section className="rounded-2xl border border-dashed border-border bg-card/50 p-5">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Skills
+            </h3>
+            <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+              List the skills you want visitors to see first.
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-4 rounded-full"
+              nativeButton={false}
+              render={<a href="/settings" />}
+            >
+              Add skills
+            </Button>
+          </section>
+        ) : null}
+
+        {/* Workflow */}
+        {careerProfile.workflowSteps.length > 0 ? (
+          <section className="rounded-2xl border border-border bg-card p-5">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Workflow
+            </h3>
+            <ol className="mt-4 flex flex-col gap-4">
+              {careerProfile.workflowSteps.map((step, index) => (
+                <li key={`${step.title}-${index}`} className="flex gap-3">
+                  <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
+                    {index + 1}
+                  </span>
+                  <div className="min-w-0 flex-1 pt-0.5">
+                    <p className="text-sm font-medium text-foreground">{step.title}</p>
+                    {step.description ? (
+                      <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                        {step.description}
+                      </p>
+                    ) : null}
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </section>
+        ) : isSelf ? (
+          <section className="rounded-2xl border border-dashed border-border bg-card/50 p-5">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Workflow
+            </h3>
+            <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+              Outline the steps you take clients through, from kickoff to
+              delivery.
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-4 rounded-full"
+              nativeButton={false}
+              render={<a href="/settings" />}
+            >
+              Add workflow steps
+            </Button>
+          </section>
+        ) : null}
+
+        {/* Experience — career timeline */}
+        {workExperience.length > 0 ? (
+          <section className="rounded-2xl border border-border bg-card p-5">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Experience
+            </h3>
+            <ol className="mt-4 flex flex-col">
+              {workExperience.map((entry, index) => (
+                <li key={entry.id} className="flex gap-3">
+                  <div className="flex flex-col items-center">
+                    <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted">
+                      <ListChecksIcon
+                        className="size-4 text-muted-foreground"
+                        aria-hidden="true"
+                      />
+                    </span>
+                    {index < workExperience.length - 1 ? (
+                      <span
+                        className="my-1 w-px flex-1 bg-border"
+                        aria-hidden="true"
+                      />
+                    ) : null}
+                  </div>
+                  <div className="min-w-0 flex-1 pb-6">
+                    <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                      <p className="text-sm font-medium text-foreground">
+                        {entry.role}
+                        <span className="text-muted-foreground"> · {entry.company}</span>
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {entry.startDate} — {entry.isCurrent ? "Present" : entry.endDate ?? "Present"}
+                      </p>
+                    </div>
+                    {entry.description ? (
+                      <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
+                        {entry.description}
+                      </p>
+                    ) : null}
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </section>
+        ) : isSelf ? (
+          <section className="rounded-2xl border border-dashed border-border bg-card/50 p-5">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Experience
+            </h3>
+            <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+              Add your past roles to build out your career timeline.
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-4 rounded-full"
+              nativeButton={false}
+              render={<a href="/settings" />}
+            >
+              Add experience
+            </Button>
+          </section>
+        ) : null}
 
         {/* Details — contact / info list */}
         <section className="rounded-2xl border border-border bg-card p-5">

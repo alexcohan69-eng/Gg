@@ -24,9 +24,21 @@ export const user = pgTable("user", {
   bannerImage: text("bannerImage"),
   website: text("website"),
   location: text("location"),
+  // Career overview fields shown on the About page. All optional —
+  // profiles that haven't filled these in fall back to empty states.
+  yearsExperience: integer("yearsExperience"),
+  totalClients: integer("totalClients"),
+  totalProjects: integer("totalProjects"),
+  skills: jsonb("skills").$type<string[]>().default([]),
+  workflowSteps: jsonb("workflowSteps").$type<WorkflowStep[]>().default([]),
   createdAt: timestamp("createdAt").notNull().defaultNow(),
   updatedAt: timestamp("updatedAt").notNull().defaultNow(),
 })
+
+export type WorkflowStep = {
+  title: string
+  description: string
+}
 
 export const session = pgTable("session", {
   id: text("id").primaryKey(),
@@ -153,6 +165,26 @@ export const blocks = pgTable("blocks", {
   id: text("id").primaryKey(),
   blockerId: text("blockerId").notNull(),
   blockedId: text("blockedId").notNull(),
+  createdAt: timestamp("createdAt").notNull().defaultNow(),
+})
+
+/**
+ * Past roles shown in the About page's experience timeline.
+ * `sortOrder` (lower = earlier in the list, typically most recent
+ * first) lets the owner reorder entries without relying on dates,
+ * since `startDate`/`endDate` are free-text ("Jan 2022") rather than
+ * real date columns.
+ */
+export const workExperience = pgTable("workExperience", {
+  id: text("id").primaryKey(),
+  userId: text("userId").notNull(),
+  role: text("role").notNull(),
+  company: text("company").notNull(),
+  startDate: text("startDate").notNull(),
+  endDate: text("endDate"),
+  isCurrent: boolean("isCurrent").notNull().default(false),
+  description: text("description"),
+  sortOrder: integer("sortOrder").notNull().default(0),
   createdAt: timestamp("createdAt").notNull().defaultNow(),
 })
 
