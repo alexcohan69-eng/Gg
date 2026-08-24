@@ -42,7 +42,7 @@ function ToolbarButton({
       // this also stops the click from firing a spurious editor "blur"
       // that callers (e.g. the post composer) may use to collapse their UI.
       onMouseDown={(e) => e.preventDefault()}
-      className="size-8 rounded-full p-0 text-muted-foreground transition-colors data-[state=on]:bg-primary data-[state=on]:text-primary-foreground data-[state=on]:shadow-sm"
+      className="size-8 rounded-full p-0 text-muted-foreground transition-colors data-[state=on]:bg-primary data-[state=on]:text-primary-foreground data-[state=on]:shadow-sm data-[state=on]:brightness-90 data-[state=on]:saturate-150"
     >
       {children}
     </Toggle>
