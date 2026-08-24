@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { EditorContent, useEditor, type Editor } from "@tiptap/react"
 import StarterKit from "@tiptap/starter-kit"
 import Placeholder from "@tiptap/extension-placeholder"
@@ -58,6 +59,25 @@ export function RichTextToolbar({
   editor: Editor | null
   className?: string
 }) {
+  // `editor.isActive(...)` below is imperative — Tiptap doesn't re-render
+  // React on its own, so without this the toolbar only ever reflects
+  // whatever was active the last time *content* changed (`onUpdate`), not
+  // when the cursor moves into/out of bold, italic, etc. Bumping a tick on
+  // every selection change and transaction (mark toggles, formatting
+  // commands) forces this component to re-render so the pressed button
+  // always matches the format under the cursor.
+  const [, setTick] = useState(0)
+  useEffect(() => {
+    if (!editor) return
+    const rerender = () => setTick((t) => t + 1)
+    editor.on("selectionUpdate", rerender)
+    editor.on("transaction", rerender)
+    return () => {
+      editor.off("selectionUpdate", rerender)
+      editor.off("transaction", rerender)
+    }
+  }, [editor])
+
   if (!editor) return null
 
   // Narrow into a local const: TypeScript doesn't retain the `!editor`
