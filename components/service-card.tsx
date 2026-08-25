@@ -66,25 +66,30 @@ export function ServiceCard({
         )}
         {/* Bottom gradient keeps the badges legible over busy cover media without a heavy scrim. */}
         <div className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-black/25 to-transparent" aria-hidden="true" />
-        {service.coverImageType === "gif" ? (
-          <span className="absolute bottom-2 left-2 rounded bg-background/80 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-foreground backdrop-blur-sm">
-            GIF
-          </span>
-        ) : null}
         {service.category ? (
           <Badge
             variant="secondary"
-            className="absolute top-2.5 left-2.5 bg-background/90 text-foreground shadow-sm backdrop-blur-sm"
+            className="absolute top-2.5 left-2.5 max-w-[calc(100%-2.75rem)] truncate bg-background/90 text-foreground shadow-sm backdrop-blur-sm"
           >
-            {service.category}
+            <span className="truncate">{service.category}</span>
           </Badge>
         ) : null}
-        {service.packages.length > 1 ? (
-          <span className="absolute top-2.5 right-2.5 inline-flex items-center gap-1 rounded-full bg-background/90 px-2 py-1 text-[11px] font-semibold text-foreground shadow-sm backdrop-blur-sm">
-            <LayersIcon className="size-3" aria-hidden="true" />
-            {service.packages.length} tiers
-          </span>
-        ) : null}
+        {/* Bottom-left, paired with the gradient scrim — the grid layers
+            the owner's "..." menu at top-right, so the tiers pill lives
+            here instead of risking a collision with it. */}
+        <div className="absolute bottom-2 left-2 flex items-center gap-1.5">
+          {service.coverImageType === "gif" ? (
+            <span className="rounded bg-background/80 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-foreground backdrop-blur-sm">
+              GIF
+            </span>
+          ) : null}
+          {service.packages.length > 1 ? (
+            <span className="inline-flex items-center gap-1 rounded-full bg-background/80 px-2 py-1 text-[11px] font-semibold text-foreground shadow-sm backdrop-blur-sm">
+              <LayersIcon className="size-3" aria-hidden="true" />
+              {service.packages.length} tiers
+            </span>
+          ) : null}
+        </div>
       </div>
       <div className="flex flex-1 flex-col gap-1.5 p-3.5">
         <h3 className="line-clamp-1 font-heading text-sm font-semibold tracking-tight text-foreground transition-colors group-hover:text-primary">
