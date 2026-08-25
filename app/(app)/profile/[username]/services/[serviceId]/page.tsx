@@ -55,6 +55,7 @@ export default async function ServiceDetailPage({
         profileIdentifier={username}
         sellerId={profile.id}
         sellerName={profile.name}
+        sellerImage={profile.image}
         isSelf={isSelf}
       />
     </div>
