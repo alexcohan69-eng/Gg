@@ -10,6 +10,7 @@ import {
   MoreHorizontalIcon,
   PencilIcon,
   PlayIcon,
+  ShoppingBagIcon,
   Trash2Icon,
 } from "lucide-react"
 import { deleteService } from "@/app/actions/services"
@@ -17,6 +18,9 @@ import { sanitizePostHtml } from "@/lib/sanitize-html"
 import type { Service } from "@/lib/services"
 import { ServiceDialog } from "@/components/service-editor"
 import { ServicePackages } from "@/components/service-packages"
+import { ServiceIncludes } from "@/components/service-includes"
+import { ServiceProcess } from "@/components/service-process"
+import { ServiceFaq } from "@/components/service-faq"
 import { MediaLightbox } from "@/components/media-lightbox"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -196,7 +200,7 @@ export function ServiceDetail({
             {/* Packages render inline in the reading column on mobile, where
                 there's no room for a side rail — the lg+ sticky copy below
                 takes over once there's space for a two-column layout. */}
-            <div className="lg:hidden">
+            <div id="service-packages-mobile" className="lg:hidden">
               <ServicePackages
                 packages={service.packages}
                 sellerId={sellerId}
@@ -237,6 +241,10 @@ export function ServiceDetail({
                 />
               </div>
             ) : null}
+
+            <ServiceIncludes packages={service.packages} deliveryDays={service.deliveryDays} />
+
+            <ServiceProcess />
 
             {service.gallery.length > 0 ? (
               <div className="flex flex-col gap-3 border-t border-border pt-6">
@@ -292,6 +300,16 @@ export function ServiceDetail({
                 </div>
               </div>
             ) : null}
+
+            <ServiceFaq
+              deliveryDays={service.deliveryDays}
+              fastestDeliveryDays={
+                service.packages.length > 0
+                  ? Math.min(...service.packages.map((pkg) => pkg.deliveryDays))
+                  : service.deliveryDays
+              }
+              hasPackages={service.packages.length > 0}
+            />
           </div>
 
           {/* Sticky booking rail — desktop/tablet only; offset below the
@@ -335,6 +353,31 @@ export function ServiceDetail({
           </div>
         </div>
       </div>
+
+      {/* Mobile-only sticky order bar — the packages panel above is
+          inline in the reading column and scrolls out of view, so this
+          keeps price + CTA reachable without re-rendering the whole
+          tiered panel. Hidden for the owner viewing their own listing. */}
+      {!isSelf ? (
+        <div className="sticky inset-x-0 bottom-0 z-20 flex items-center justify-between gap-4 border-t border-border bg-background/95 p-4 backdrop-blur-sm lg:hidden">
+          <div>
+            <p className="text-xs font-medium text-muted-foreground">Starting at</p>
+            <p className="font-heading text-lg font-semibold text-foreground">
+              ${service.startingPrice.toLocaleString()}
+            </p>
+          </div>
+          <Button
+            type="button"
+            size="lg"
+            onClick={() =>
+              document.getElementById("service-packages-mobile")?.scrollIntoView({ behavior: "smooth", block: "start" })
+            }
+          >
+            <ShoppingBagIcon data-icon="inline-start" />
+            Order now
+          </Button>
+        </div>
+      ) : null}
 
       <MediaLightbox
         items={lightboxItems}
