@@ -47,6 +47,11 @@ const MIN_PRICE = 1
 const MAX_PRICE = 1_000_000
 const MIN_DELIVERY_DAYS = 1
 const MAX_DELIVERY_DAYS = 365
+const MAX_PACKAGES = 3
+const MAX_PACKAGE_NAME = 30
+const MAX_PACKAGE_DESCRIPTION = 300
+const MAX_PACKAGE_FEATURES = 8
+const MAX_PACKAGE_FEATURE_LENGTH = 80
 
 const MEDIA_TYPES: MediaType[] = ["image", "gif", "video"]
 function isMediaType(value: unknown): value is MediaType {
@@ -60,6 +65,66 @@ function parseMediaAttachment(value: unknown): MediaAttachment | null {
   const type = "type" in value ? (value as { type: unknown }).type : "image"
   if (!url) return null
   return { url, type: isMediaType(type) ? type : "image" }
+}
+
+type ServicePackageInput = {
+  name: string
+  price: number
+  deliveryDays: number
+  description: string
+  features: string[]
+}
+
+/** Parses + validates the client-submitted JSON array of Basic/Standard/Premium pricing tiers. */
+function parsePackagesInput(raw: string): ServicePackageInput[] | { error: string } {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  } catch {
+    return { error: "Invalid packages." }
+  }
+  if (!Array.isArray(parsed)) return { error: "Invalid packages." }
+  if (parsed.length > MAX_PACKAGES) {
+    return { error: `You can add up to ${MAX_PACKAGES} pricing packages.` }
+  }
+
+  const packages: ServicePackageInput[] = []
+  for (const item of parsed) {
+    if (!item || typeof item !== "object") return { error: "Invalid packages." }
+    const name = String((item as { name?: unknown }).name ?? "").trim()
+    const price = Number((item as { price?: unknown }).price)
+    const deliveryDays = Number((item as { deliveryDays?: unknown }).deliveryDays)
+    const description = String((item as { description?: unknown }).description ?? "").trim()
+    const featuresRaw = (item as { features?: unknown }).features
+    const features = Array.isArray(featuresRaw)
+      ? featuresRaw.map((f) => String(f).trim()).filter(Boolean)
+      : []
+
+    if (!name || name.length > MAX_PACKAGE_NAME) {
+      return { error: `Each package name is required and must be ${MAX_PACKAGE_NAME} characters or fewer.` }
+    }
+    if (!Number.isFinite(price) || !Number.isInteger(price) || price < MIN_PRICE || price > MAX_PRICE) {
+      return { error: `Each package price must be a whole number between $${MIN_PRICE} and $${MAX_PRICE.toLocaleString()}.` }
+    }
+    if (
+      !Number.isFinite(deliveryDays) ||
+      !Number.isInteger(deliveryDays) ||
+      deliveryDays < MIN_DELIVERY_DAYS ||
+      deliveryDays > MAX_DELIVERY_DAYS
+    ) {
+      return { error: `Each package's delivery time must be a whole number of days between ${MIN_DELIVERY_DAYS} and ${MAX_DELIVERY_DAYS}.` }
+    }
+    if (description.length > MAX_PACKAGE_DESCRIPTION) {
+      return { error: `Each package description must be ${MAX_PACKAGE_DESCRIPTION} characters or fewer.` }
+    }
+    if (features.length > MAX_PACKAGE_FEATURES || features.some((f) => f.length > MAX_PACKAGE_FEATURE_LENGTH)) {
+      return { error: `Each package can list up to ${MAX_PACKAGE_FEATURES} features of ${MAX_PACKAGE_FEATURE_LENGTH} characters or fewer.` }
+    }
+
+    packages.push({ name, price, deliveryDays, description, features })
+  }
+
+  return packages
 }
 
 async function assertOwnsService(userId: string, id: string) {
@@ -83,6 +148,7 @@ function parseServiceForm(formData: FormData):
       coverImage: string | null
       coverImageType: MediaType | null
       gallery: MediaAttachment[]
+      packages: ServicePackageInput[]
     }
   | { error: string } {
   const title = String(formData.get("title") ?? "").trim()
@@ -157,6 +223,12 @@ function parseServiceForm(formData: FormData):
     return { error: galleryError }
   }
 
+  const packagesRaw = String(formData.get("packages") ?? "[]")
+  const packagesResult = parsePackagesInput(packagesRaw)
+  if ("error" in packagesResult) {
+    return { error: packagesResult.error }
+  }
+
   const sanitizedDescription = descriptionHtml ? sanitizePostHtml(descriptionHtml) : ""
   if (stripHtmlToText(sanitizedDescription).length > MAX_DESCRIPTION_TEXT) {
     return { error: `Description must be ${MAX_DESCRIPTION_TEXT} characters or fewer.` }
@@ -173,6 +245,7 @@ function parseServiceForm(formData: FormData):
     coverImage,
     coverImageType,
     gallery,
+    packages: packagesResult,
   }
 }
 
@@ -205,6 +278,7 @@ export async function addService(formData: FormData): Promise<ActionResult> {
     description: parsed.description,
     tags: JSON.stringify(parsed.tags),
     gallery: JSON.stringify(parsed.gallery),
+    packages: JSON.stringify(parsed.packages),
     sortOrder: existing.length,
   })
 
@@ -240,6 +314,7 @@ export async function updateService(id: string, formData: FormData): Promise<Act
       description: parsed.description,
       tags: JSON.stringify(parsed.tags),
       gallery: JSON.stringify(parsed.gallery),
+      packages: JSON.stringify(parsed.packages),
       updatedAt: new Date(),
     })
     .where(and(eq(services.id, id), eq(services.userId, userId)))

@@ -3,6 +3,19 @@ import { db } from "@/lib/db"
 import { services } from "@/lib/db/schema"
 import type { MediaAttachment, MediaType } from "@/lib/media"
 
+/**
+ * A single Basic/Standard/Premium-style pricing tier for a service
+ * listing, Fiverr-gig style. Optional — a listing with no packages
+ * falls back to its flat `startingPrice`/`deliveryDays`.
+ */
+export type ServicePackage = {
+  name: string
+  price: number
+  deliveryDays: number
+  description: string
+  features: string[]
+}
+
 export type Service = {
   id: string
   userId: string
@@ -16,6 +29,7 @@ export type Service = {
   tags: string[]
   description: string | null
   gallery: MediaAttachment[]
+  packages: ServicePackage[]
   sortOrder: number
   createdAt: Date
   updatedAt: Date
@@ -51,6 +65,24 @@ function parseGallery(value: string | null): MediaAttachment[] {
     .filter((item): item is MediaAttachment => item !== null)
 }
 
+/** Packages are stored as JSON-encoded TEXT array of `ServicePackage` tiers. */
+function parsePackages(value: string | null): ServicePackage[] {
+  const parsed = parseJsonArray<Partial<ServicePackage>>(value)
+  return parsed
+    .map((item) =>
+      item && typeof item.name === "string" && typeof item.price === "number"
+        ? {
+            name: item.name,
+            price: item.price,
+            deliveryDays: typeof item.deliveryDays === "number" ? item.deliveryDays : 1,
+            description: typeof item.description === "string" ? item.description : "",
+            features: Array.isArray(item.features) ? item.features.filter((f): f is string => typeof f === "string") : [],
+          }
+        : null,
+    )
+    .filter((item): item is ServicePackage => item !== null)
+}
+
 function toService(row: {
   id: string
   userId: string
@@ -64,6 +96,7 @@ function toService(row: {
   tags: string | null
   description: string | null
   gallery: string | null
+  packages: string | null
   sortOrder: number
   createdAt: Date
   updatedAt: Date
@@ -73,6 +106,7 @@ function toService(row: {
     coverImageType: (row.coverImageType as MediaType | null) ?? "image",
     tags: parseJsonArray<string>(row.tags),
     gallery: parseGallery(row.gallery),
+    packages: parsePackages(row.packages),
   }
 }
 

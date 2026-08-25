@@ -267,6 +267,9 @@ const statements = [
     "updatedAt" timestamp not null default now()
   )`,
   `create index async if not exists services_userId_sortOrder_idx on "services" ("userId", "sortOrder")`,
+  // Added after the table already existed in prior environments —
+  // JSON-encoded array of Basic/Standard/Premium pricing packages.
+  `alter table "services" add column if not exists "packages" text`,
 
   // Moderation MVP: blocks + reports
   `create table if not exists "blocks" (

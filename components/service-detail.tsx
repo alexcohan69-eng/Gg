@@ -6,19 +6,17 @@ import Image from "next/image"
 import { toast } from "sonner"
 import {
   BriefcaseIcon,
-  ClockIcon,
   ExpandIcon,
-  MailIcon,
   MoreHorizontalIcon,
   PencilIcon,
   PlayIcon,
   Trash2Icon,
 } from "lucide-react"
 import { deleteService } from "@/app/actions/services"
-import { startConversation } from "@/app/actions/messages"
 import { sanitizePostHtml } from "@/lib/sanitize-html"
 import type { Service } from "@/lib/services"
 import { ServiceDialog } from "@/components/service-editor"
+import { ServicePackages } from "@/components/service-packages"
 import { MediaLightbox } from "@/components/media-lightbox"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -59,7 +57,6 @@ export function ServiceDetail({
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
   const [isPending, startTransition] = useTransition()
-  const [isContacting, startContacting] = useTransition()
 
   function handleChanged() {
     router.refresh()
@@ -74,17 +71,6 @@ export function ServiceDetail({
       }
       toast.success("Service removed")
       router.push(`/profile/${profileIdentifier}/services`)
-    })
-  }
-
-  function handleContact() {
-    startContacting(async () => {
-      const result = await startConversation(sellerId)
-      if (!result.success) {
-        toast.error(result.error)
-        return
-      }
-      router.push(`/messages/${result.data.conversationId}`)
     })
   }
 
@@ -151,18 +137,22 @@ export function ServiceDetail({
             GIF
           </span>
         ) : null}
+        <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/20 to-transparent" aria-hidden="true" />
       </button>
 
-      <div className="flex flex-col gap-6 p-4 pb-10">
+      {/* Overlaps the hero by rounding up and pulling the content up, a
+          Fiverr/Upwork-style "listing card floats over the banner" treatment
+          that reads as more polished than a hard seam. */}
+      <div className="relative z-10 -mt-5 flex flex-col gap-6 rounded-t-3xl bg-background p-4 pb-10 sm:-mt-8">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <p className="text-xs font-medium tracking-wide text-primary uppercase">
+            <p className="text-xs font-semibold tracking-wide text-primary uppercase">
               {service.category || "Service"}
             </p>
-            <h1 className="mt-1 font-heading text-2xl font-semibold tracking-tight text-foreground text-balance">
+            <h1 className="mt-1.5 font-heading text-2xl font-semibold tracking-tight text-foreground text-balance">
               {service.title}
             </h1>
-            <p className="mt-1.5 text-base text-muted-foreground text-pretty">{service.tagline}</p>
+            <p className="mt-1.5 text-base leading-relaxed text-muted-foreground text-pretty">{service.tagline}</p>
           </div>
           {isSelf ? (
             <DropdownMenu>
@@ -193,38 +183,23 @@ export function ServiceDetail({
           ) : null}
         </div>
 
-        <div className="flex items-center gap-3 rounded-2xl border border-border bg-card/60 p-4">
-          <div className="flex-1">
-            <p className="text-xs text-muted-foreground">Starting at</p>
-            <p className="font-heading text-2xl font-semibold tracking-tight text-foreground">
-              ${service.startingPrice.toLocaleString()}
-            </p>
-          </div>
-          <div className="h-8 w-px bg-border" aria-hidden="true" />
-          <div className="flex-1">
-            <p className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-              <ClockIcon className="size-3.5" aria-hidden="true" />
-              Delivery
-            </p>
-            <p className="font-heading text-2xl font-semibold tracking-tight text-foreground">
-              {service.deliveryDays} {service.deliveryDays === 1 ? "day" : "days"}
-            </p>
-          </div>
-        </div>
-
-        {!isSelf ? (
-          <Button type="button" size="lg" disabled={isContacting} onClick={handleContact}>
-            {isContacting ? <Spinner data-icon="inline-start" /> : <MailIcon data-icon="inline-start" />}
-            Contact {sellerName.split(" ")[0]}
-          </Button>
-        ) : null}
+        <ServicePackages
+          packages={service.packages}
+          sellerId={sellerId}
+          sellerName={sellerName}
+          isSelf={isSelf}
+          fallbackPrice={service.startingPrice}
+          fallbackDeliveryDays={service.deliveryDays}
+        />
 
         {hasMeta ? (
-          <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card/60 p-4">
+          <div className="flex flex-col gap-3">
             {service.tags.length > 0 ? (
-              <div className="flex items-center justify-between gap-4 text-sm">
-                <span className="shrink-0 text-muted-foreground">Focus</span>
-                <div className="flex flex-wrap justify-end gap-1.5">
+              <div className="flex items-center gap-3">
+                <span className="shrink-0 text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                  Focus
+                </span>
+                <div className="flex flex-wrap gap-1.5">
                   {service.tags.map((tag) => (
                     <Badge key={tag} variant="secondary">
                       {tag}

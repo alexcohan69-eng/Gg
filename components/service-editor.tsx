@@ -4,9 +4,9 @@ import { useRef, useState, useTransition } from "react"
 import Image from "next/image"
 import { upload } from "@vercel/blob/client"
 import { toast } from "sonner"
-import { CameraIcon, ImagePlusIcon, PlayIcon, XIcon } from "lucide-react"
+import { CameraIcon, CheckIcon, ImagePlusIcon, PlayIcon, PlusIcon, XIcon } from "lucide-react"
 import { addService, updateService } from "@/app/actions/services"
-import type { Service } from "@/lib/services"
+import type { Service, ServicePackage } from "@/lib/services"
 import { useRichTextEditor, RichTextEditor, RichTextToolbar } from "@/components/rich-text-editor"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -385,6 +385,200 @@ function TagInput({ value, onChange }: { value: string[]; onChange: (tags: strin
   )
 }
 
+type PackageDraft = {
+  name: string
+  price: string
+  deliveryDays: string
+  description: string
+  features: string[]
+}
+
+const MAX_PACKAGES = 3
+const MAX_PACKAGE_FEATURES = 8
+const PACKAGE_PRESET_NAMES = ["Basic", "Standard", "Premium"]
+
+function emptyPackageDraft(index: number): PackageDraft {
+  return { name: PACKAGE_PRESET_NAMES[index] ?? "", price: "", deliveryDays: "", description: "", features: [] }
+}
+
+function packageToDraft(pkg: ServicePackage): PackageDraft {
+  return {
+    name: pkg.name,
+    price: String(pkg.price),
+    deliveryDays: String(pkg.deliveryDays),
+    description: pkg.description,
+    features: pkg.features,
+  }
+}
+
+function PackageFeatureInput({
+  value,
+  onChange,
+}: {
+  value: string[]
+  onChange: (features: string[]) => void
+}) {
+  const [draft, setDraft] = useState("")
+
+  function addFeature() {
+    const feature = draft.trim()
+    if (!feature) return
+    if (value.length >= MAX_PACKAGE_FEATURES) {
+      toast.error(`You can add up to ${MAX_PACKAGE_FEATURES} features per package.`)
+      return
+    }
+    onChange([...value, feature])
+    setDraft("")
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      {value.length > 0 ? (
+        <ul className="flex flex-col gap-1.5">
+          {value.map((feature, index) => (
+            <li
+              key={index}
+              className="flex items-center gap-2 rounded-md bg-muted px-2.5 py-1.5 text-sm text-foreground"
+            >
+              <CheckIcon className="size-3.5 shrink-0 text-primary" aria-hidden="true" />
+              <span className="flex-1 truncate">{feature}</span>
+              <button
+                type="button"
+                onClick={() => onChange(value.filter((_, i) => i !== index))}
+                className="rounded-full p-0.5 text-muted-foreground hover:bg-foreground/10 hover:text-foreground"
+                aria-label={`Remove ${feature}`}
+              >
+                <XIcon className="size-3" aria-hidden="true" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      <div className="flex items-center gap-2">
+        <Input
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault()
+              addFeature()
+            }
+          }}
+          placeholder="e.g. 3 rounds of revisions"
+          maxLength={80}
+        />
+        <Button type="button" variant="outline" size="sm" onClick={addFeature}>
+          Add
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Optional Basic/Standard/Premium pricing tiers, Fiverr-gig style.
+ * Each tier has its own price, delivery time, short description, and
+ * checklist of included features. A listing with none of these still
+ * works — it just falls back to the flat starting price/delivery
+ * fields above.
+ */
+function PackagesEditor({
+  value,
+  onChange,
+}: {
+  value: PackageDraft[]
+  onChange: (packages: PackageDraft[]) => void
+}) {
+  function updatePackage(index: number, patch: Partial<PackageDraft>) {
+    onChange(value.map((pkg, i) => (i === index ? { ...pkg, ...patch } : pkg)))
+  }
+
+  return (
+    <Field>
+      <div className="flex items-center justify-between gap-2">
+        <FieldLabel>Pricing packages</FieldLabel>
+        {value.length < MAX_PACKAGES ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => onChange([...value, emptyPackageDraft(value.length)])}
+          >
+            <PlusIcon data-icon="inline-start" />
+            Add tier
+          </Button>
+        ) : null}
+      </div>
+      <FieldDescription>
+        Optional — break this listing into tiers (Basic, Standard, Premium) so clients can pick the scope that fits
+        instead of one flat price.
+      </FieldDescription>
+
+      {value.length > 0 ? (
+        <div className="flex flex-col gap-3">
+          {value.map((pkg, index) => (
+            <div key={index} className="flex flex-col gap-3 rounded-xl border border-border bg-card/60 p-3">
+              <div className="flex items-center justify-between gap-2">
+                <Input
+                  value={pkg.name}
+                  onChange={(e) => updatePackage(index, { name: e.target.value })}
+                  placeholder={PACKAGE_PRESET_NAMES[index] ?? "Tier name"}
+                  maxLength={30}
+                  className="h-8 max-w-[160px] font-medium"
+                  aria-label={`Package ${index + 1} name`}
+                />
+                <button
+                  type="button"
+                  onClick={() => onChange(value.filter((_, i) => i !== index))}
+                  className="rounded-full p-1 text-muted-foreground hover:bg-foreground/10 hover:text-foreground"
+                  aria-label={`Remove ${pkg.name || "package"} tier`}
+                >
+                  <XIcon className="size-3.5" aria-hidden="true" />
+                </button>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <Input
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  max={1_000_000}
+                  step={1}
+                  value={pkg.price}
+                  onChange={(e) => updatePackage(index, { price: e.target.value })}
+                  placeholder="Price (USD)"
+                  aria-label={`${pkg.name || "Package"} price`}
+                />
+                <Input
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  max={365}
+                  step={1}
+                  value={pkg.deliveryDays}
+                  onChange={(e) => updatePackage(index, { deliveryDays: e.target.value })}
+                  placeholder="Delivery days"
+                  aria-label={`${pkg.name || "Package"} delivery days`}
+                />
+              </div>
+              <Input
+                value={pkg.description}
+                onChange={(e) => updatePackage(index, { description: e.target.value })}
+                placeholder="What's included in this tier"
+                maxLength={300}
+                aria-label={`${pkg.name || "Package"} description`}
+              />
+              <PackageFeatureInput
+                value={pkg.features}
+                onChange={(features) => updatePackage(index, { features })}
+              />
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </Field>
+  )
+}
+
 export function ServiceDialog({
   open,
   onOpenChange,
@@ -401,6 +595,7 @@ export function ServiceDialog({
   )
   const [gallery, setGallery] = useState<MediaAttachment[]>(service?.gallery ?? [])
   const [tags, setTags] = useState<string[]>(service?.tags ?? [])
+  const [packages, setPackages] = useState<PackageDraft[]>((service?.packages ?? []).map(packageToDraft))
   const [error, setError] = useState<string | null>(null)
   const [insertingImage, setInsertingImage] = useState(false)
   const [isPending, startTransition] = useTransition()
@@ -442,6 +637,19 @@ export function ServiceDialog({
     formData.set("gallery", JSON.stringify(gallery))
     formData.set("tags", JSON.stringify(tags))
     formData.set("description", editor?.getHTML() ?? "")
+
+    // Drop any tier the owner started but never gave a name + price —
+    // an incomplete draft shouldn't block or corrupt the save.
+    const cleanPackages = packages
+      .filter((pkg) => pkg.name.trim() && pkg.price.trim())
+      .map((pkg) => ({
+        name: pkg.name.trim(),
+        price: Number(pkg.price),
+        deliveryDays: Number(pkg.deliveryDays) || 1,
+        description: pkg.description.trim(),
+        features: pkg.features,
+      }))
+    formData.set("packages", JSON.stringify(cleanPackages))
 
     startTransition(async () => {
       const result = service
@@ -544,6 +752,8 @@ export function ServiceDialog({
             </Field>
 
             <TagInput value={tags} onChange={setTags} />
+
+            <PackagesEditor value={packages} onChange={setPackages} />
 
             <Field>
               <FieldLabel>Description</FieldLabel>

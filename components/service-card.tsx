@@ -1,6 +1,6 @@
 import Link from "next/link"
 import Image from "next/image"
-import { BriefcaseIcon, ClockIcon } from "lucide-react"
+import { BriefcaseIcon, ClockIcon, LayersIcon } from "lucide-react"
 import type { Service } from "@/lib/services"
 import { Badge } from "@/components/ui/badge"
 
@@ -19,10 +19,22 @@ export function ServiceCard({
   service: Service
   profileIdentifier: string
 }) {
+  // When pricing packages exist, lead with the cheapest tier's price
+  // and fastest tier's delivery — the flat startingPrice/deliveryDays
+  // fields are the fallback for listings without tiers.
+  const displayPrice =
+    service.packages.length > 0
+      ? Math.min(...service.packages.map((pkg) => pkg.price))
+      : service.startingPrice
+  const displayDeliveryDays =
+    service.packages.length > 0
+      ? Math.min(...service.packages.map((pkg) => pkg.deliveryDays))
+      : service.deliveryDays
+
   return (
     <Link
       href={`/profile/${profileIdentifier}/services/${service.id}`}
-      className="group flex flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-all hover:-translate-y-0.5 hover:border-ring/60 hover:shadow-md"
+      className="group flex flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-ring/50 hover:shadow-lg"
     >
       <div className="relative aspect-[4/3] w-full overflow-hidden bg-muted">
         {service.coverImage ? (
@@ -52,6 +64,8 @@ export function ServiceCard({
             <BriefcaseIcon className="size-8 text-muted-foreground" aria-hidden="true" />
           </div>
         )}
+        {/* Bottom gradient keeps the badges legible over busy cover media without a heavy scrim. */}
+        <div className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-black/25 to-transparent" aria-hidden="true" />
         {service.coverImageType === "gif" ? (
           <span className="absolute bottom-2 left-2 rounded bg-background/80 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-foreground backdrop-blur-sm">
             GIF
@@ -60,24 +74,31 @@ export function ServiceCard({
         {service.category ? (
           <Badge
             variant="secondary"
-            className="absolute top-2.5 left-2.5 bg-background/90 text-foreground backdrop-blur-sm"
+            className="absolute top-2.5 left-2.5 bg-background/90 text-foreground shadow-sm backdrop-blur-sm"
           >
             {service.category}
           </Badge>
         ) : null}
+        {service.packages.length > 1 ? (
+          <span className="absolute top-2.5 right-2.5 inline-flex items-center gap-1 rounded-full bg-background/90 px-2 py-1 text-[11px] font-semibold text-foreground shadow-sm backdrop-blur-sm">
+            <LayersIcon className="size-3" aria-hidden="true" />
+            {service.packages.length} tiers
+          </span>
+        ) : null}
       </div>
-      <div className="flex flex-1 flex-col gap-1.5 p-3">
-        <h3 className="line-clamp-1 font-heading text-sm font-semibold tracking-tight text-foreground">
+      <div className="flex flex-1 flex-col gap-1.5 p-3.5">
+        <h3 className="line-clamp-1 font-heading text-sm font-semibold tracking-tight text-foreground transition-colors group-hover:text-primary">
           {service.title}
         </h3>
-        <p className="line-clamp-2 text-sm text-muted-foreground">{service.tagline}</p>
-        <div className="mt-auto flex items-center justify-between gap-2 pt-1.5">
+        <p className="line-clamp-2 text-sm leading-relaxed text-muted-foreground">{service.tagline}</p>
+        <div className="mt-auto flex items-center justify-between gap-2 border-t border-border/70 pt-2.5">
           <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
             <ClockIcon className="size-3.5" aria-hidden="true" />
-            {service.deliveryDays} {service.deliveryDays === 1 ? "day" : "days"}
+            {displayDeliveryDays} {displayDeliveryDays === 1 ? "day" : "days"}
           </span>
-          <span className="text-sm font-semibold text-foreground">
-            From ${service.startingPrice.toLocaleString()}
+          <span className="text-right">
+            <span className="block text-[10px] leading-none text-muted-foreground">From</span>
+            <span className="text-sm font-semibold text-foreground">${displayPrice.toLocaleString()}</span>
           </span>
         </div>
       </div>
