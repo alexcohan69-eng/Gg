@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils"
 const TABS = [
   { key: "posts", label: "Posts", suffix: "" },
   { key: "work", label: "Work", suffix: "/work" },
+  { key: "services", label: "Services", suffix: "/services" },
   { key: "about", label: "About", suffix: "/about" },
 ] as const
 
@@ -20,7 +21,7 @@ export function ProfileTabs({
   current,
 }: {
   identifier: string
-  current: "posts" | "work" | "about"
+  current: "posts" | "work" | "services" | "about"
 }) {
   return (
     <nav

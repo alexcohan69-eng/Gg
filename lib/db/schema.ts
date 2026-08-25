@@ -227,6 +227,37 @@ export const portfolioProjects = pgTable("portfolioProjects", {
 })
 
 /**
+ * Fiverr-gig-style listings shown on the profile's Services tab — what
+ * the user offers, a starting price, and a delivery estimate. Same
+ * shape/conventions as `portfolioProjects` (JSON-encoded TEXT for
+ * `tags`/`gallery` since Aurora DSQL has no array/JSON column types,
+ * `sortOrder` for manual reordering) — see lib/services.ts for the
+ * parse helpers.
+ */
+export const services = pgTable("services", {
+  id: text("id").primaryKey(),
+  userId: text("userId").notNull(),
+  title: text("title").notNull(),
+  tagline: text("tagline").notNull(),
+  coverImage: text("coverImage"),
+  // "image" | "gif" | "video" (see lib/media.ts MediaType).
+  coverImageType: text("coverImageType"),
+  // Starting price, stored in whole-dollar units (no cents) — this is
+  // a "starting at $X" listing price, not a checkout amount.
+  startingPrice: integer("startingPrice").notNull(),
+  deliveryDays: integer("deliveryDays").notNull(),
+  category: text("category"),
+  tags: text("tags"),
+  description: text("description"),
+  // JSON-encoded TEXT array of `{ url, type }` MediaAttachment objects,
+  // same convention as portfolioProjects.gallery.
+  gallery: text("gallery"),
+  sortOrder: integer("sortOrder").notNull().default(0),
+  createdAt: timestamp("createdAt").notNull().defaultNow(),
+  updatedAt: timestamp("updatedAt").notNull().defaultNow(),
+})
+
+/**
  * Moderation reports for the report-post / report-user MVP. `reason`
  * is a small closed set of strings (see lib/moderation.ts) rather than
  * its own enum table. `status` + `reviewedBy`/`reviewedAt` back the

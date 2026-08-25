@@ -249,6 +249,25 @@ const statements = [
   // "image" | "gif" | "video" for the cover, mirroring gallery items.
   `alter table "portfolioProjects" add column if not exists "coverImageType" text`,
 
+  `create table if not exists "services" (
+    id text primary key,
+    "userId" text not null,
+    title text not null,
+    tagline text not null,
+    "coverImage" text,
+    "coverImageType" text,
+    "startingPrice" integer not null,
+    "deliveryDays" integer not null,
+    category text,
+    tags text,
+    description text,
+    gallery text,
+    "sortOrder" integer not null default 0,
+    "createdAt" timestamp not null default now(),
+    "updatedAt" timestamp not null default now()
+  )`,
+  `create index async if not exists services_userId_sortOrder_idx on "services" ("userId", "sortOrder")`,
+
   // Moderation MVP: blocks + reports
   `create table if not exists "blocks" (
     id text primary key,

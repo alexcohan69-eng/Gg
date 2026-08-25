@@ -33,7 +33,8 @@ export async function GET(request: NextRequest) {
     !(
       pathname.startsWith("posts/") ||
       pathname.startsWith("profile/") ||
-      pathname.startsWith("portfolio/")
+      pathname.startsWith("portfolio/") ||
+      pathname.startsWith("services/")
     )
   ) {
     return NextResponse.json({ error: "Invalid pathname" }, { status: 400 })
