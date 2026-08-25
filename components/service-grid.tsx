@@ -227,11 +227,11 @@ export function ServiceGrid({
   }
 
   return (
-    <div className="flex flex-col gap-4 p-4">
+    <div className="flex flex-col gap-5 p-4">
       <div className="flex items-center justify-between gap-3 border-b border-border pb-4">
         <div>
-          <h2 className="font-heading text-base font-semibold tracking-tight text-foreground">Services</h2>
-          <p className="text-sm text-muted-foreground">
+          <h2 className="font-heading text-lg font-semibold tracking-tight text-foreground">Services</h2>
+          <p className="mt-0.5 text-sm text-muted-foreground">
             {services.length} {services.length === 1 ? "listing" : "listings"}
             {isSelf ? ` · ${MAX_SERVICES - services.length} remaining` : null}
           </p>
@@ -249,7 +249,7 @@ export function ServiceGrid({
         ) : null}
       </div>
 
-      <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-3">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
         {services.map((service, index) =>
           isSelf ? (
             <OwnerServiceTile

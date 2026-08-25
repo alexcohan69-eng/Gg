@@ -34,7 +34,7 @@ export function ServiceCard({
   return (
     <Link
       href={`/profile/${profileIdentifier}/services/${service.id}`}
-      className="group flex flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-ring/50 hover:shadow-lg"
+      className="group flex flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5"
     >
       <div className="relative aspect-[4/3] w-full overflow-hidden bg-muted">
         {service.coverImage ? (
@@ -60,16 +60,16 @@ export function ServiceCard({
             />
           )
         ) : (
-          <div className="flex h-full w-full items-center justify-center">
+          <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-muted to-muted/60">
             <BriefcaseIcon className="size-8 text-muted-foreground" aria-hidden="true" />
           </div>
         )}
         {/* Bottom gradient keeps the badges legible over busy cover media without a heavy scrim. */}
-        <div className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-black/25 to-transparent" aria-hidden="true" />
+        <div className="absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-black/30 to-transparent" aria-hidden="true" />
         {service.category ? (
           <Badge
             variant="secondary"
-            className="absolute top-2.5 left-2.5 max-w-[calc(100%-2.75rem)] truncate bg-background/90 text-foreground shadow-sm backdrop-blur-sm"
+            className="absolute top-2.5 left-2.5 max-w-[calc(100%-2.75rem)] truncate border-none bg-background/90 text-foreground shadow-sm backdrop-blur-md"
           >
             <span className="truncate">{service.category}</span>
           </Badge>
@@ -84,26 +84,30 @@ export function ServiceCard({
             </span>
           ) : null}
           {service.packages.length > 1 ? (
-            <span className="inline-flex items-center gap-1 rounded-full bg-background/80 px-2 py-1 text-[11px] font-semibold text-foreground shadow-sm backdrop-blur-sm">
+            <span className="inline-flex items-center gap-1 rounded-full bg-background/85 px-2 py-1 text-[11px] font-semibold text-foreground shadow-sm backdrop-blur-md">
               <LayersIcon className="size-3" aria-hidden="true" />
               {service.packages.length} tiers
             </span>
           ) : null}
         </div>
       </div>
-      <div className="flex flex-1 flex-col gap-1.5 p-3.5">
+      <div className="flex flex-1 flex-col gap-2 p-4">
         <h3 className="line-clamp-1 font-heading text-sm font-semibold tracking-tight text-foreground transition-colors group-hover:text-primary">
           {service.title}
         </h3>
-        <p className="line-clamp-2 text-sm leading-relaxed text-muted-foreground">{service.tagline}</p>
-        <div className="mt-auto flex items-center justify-between gap-2 border-t border-border/70 pt-2.5">
-          <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+        <p className="line-clamp-2 flex-1 text-sm leading-relaxed text-muted-foreground">{service.tagline}</p>
+        <div className="mt-1 flex items-center justify-between gap-2 border-t border-border/70 pt-3">
+          <span className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
             <ClockIcon className="size-3.5" aria-hidden="true" />
             {displayDeliveryDays} {displayDeliveryDays === 1 ? "day" : "days"}
           </span>
           <span className="text-right">
-            <span className="block text-[10px] leading-none text-muted-foreground">From</span>
-            <span className="text-sm font-semibold text-foreground">${displayPrice.toLocaleString()}</span>
+            <span className="block text-[10px] leading-none font-medium tracking-wide text-muted-foreground uppercase">
+              From
+            </span>
+            <span className="font-heading text-base font-semibold tracking-tight text-foreground">
+              ${displayPrice.toLocaleString()}
+            </span>
           </span>
         </div>
       </div>

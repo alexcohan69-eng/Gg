@@ -44,12 +44,14 @@ export function ServiceDetail({
   profileIdentifier,
   sellerId,
   sellerName,
+  sellerImage,
   isSelf,
 }: {
   service: Service
   profileIdentifier: string
   sellerId: string
   sellerName: string
+  sellerImage: string | null
   isSelf: boolean
 }) {
   const router = useRouter()
@@ -128,8 +130,10 @@ export function ServiceDetail({
             />
           )
         ) : (
-          <div className="flex h-full w-full items-center justify-center">
-            <BriefcaseIcon className="size-10 text-muted-foreground" aria-hidden="true" />
+          <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-primary/15 via-muted to-muted">
+            <span className="flex size-16 items-center justify-center rounded-2xl bg-background/80 shadow-sm backdrop-blur-sm">
+              <BriefcaseIcon className="size-7 text-primary" aria-hidden="true" />
+            </span>
           </div>
         )}
         {service.coverImageType === "gif" ? (
@@ -142,136 +146,194 @@ export function ServiceDetail({
 
       {/* Overlaps the hero by rounding up and pulling the content up, a
           Fiverr/Upwork-style "listing card floats over the banner" treatment
-          that reads as more polished than a hard seam. */}
-      <div className="relative z-10 -mt-5 flex flex-col gap-6 rounded-t-3xl bg-background p-4 pb-10 sm:-mt-8">
-        <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0">
-            <p className="text-xs font-semibold tracking-wide text-primary uppercase">
-              {service.category || "Service"}
-            </p>
-            <h1 className="mt-1.5 font-heading text-2xl font-semibold tracking-tight text-foreground text-balance">
-              {service.title}
-            </h1>
-            <p className="mt-1.5 text-base leading-relaxed text-muted-foreground text-pretty">{service.tagline}</p>
-          </div>
-          {isSelf ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger
-                render={
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon-sm"
-                    className="shrink-0 rounded-full"
-                    aria-label="Service options"
-                  >
-                    <MoreHorizontalIcon />
-                  </Button>
-                }
+          that reads as more polished than a hard seam. On lg+ the layout
+          splits into a reading column plus a sticky booking rail, like a
+          premium marketplace listing rather than a stacked mobile page. */}
+      <div className="relative z-10 -mt-5 rounded-t-3xl bg-background sm:-mt-8">
+        <div className="mx-auto flex max-w-5xl flex-col gap-8 p-4 pb-12 lg:grid lg:grid-cols-[1fr_360px] lg:items-start lg:gap-10 lg:px-6">
+          <div className="flex min-w-0 flex-col gap-6 lg:order-1">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold tracking-wide text-primary uppercase">
+                  {service.category || "Service"}
+                </p>
+                <h1 className="mt-1.5 font-heading text-2xl font-semibold tracking-tight text-foreground text-balance sm:text-3xl">
+                  {service.title}
+                </h1>
+                <p className="mt-2 text-base leading-relaxed text-muted-foreground text-pretty">
+                  {service.tagline}
+                </p>
+              </div>
+              {isSelf ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger
+                    render={
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon-sm"
+                        className="shrink-0 rounded-full"
+                        aria-label="Service options"
+                      >
+                        <MoreHorizontalIcon />
+                      </Button>
+                    }
+                  />
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => setEditOpen(true)}>
+                      <PencilIcon data-icon="inline-start" />
+                      Edit service
+                    </DropdownMenuItem>
+                    <DropdownMenuItem variant="destructive" onClick={() => setDeleteOpen(true)}>
+                      <Trash2Icon data-icon="inline-start" />
+                      Delete service
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : null}
+            </div>
+
+            {/* Packages render inline in the reading column on mobile, where
+                there's no room for a side rail — the lg+ sticky copy below
+                takes over once there's space for a two-column layout. */}
+            <div className="lg:hidden">
+              <ServicePackages
+                packages={service.packages}
+                sellerId={sellerId}
+                sellerName={sellerName}
+                isSelf={isSelf}
+                fallbackPrice={service.startingPrice}
+                fallbackDeliveryDays={service.deliveryDays}
               />
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => setEditOpen(true)}>
-                  <PencilIcon data-icon="inline-start" />
-                  Edit service
-                </DropdownMenuItem>
-                <DropdownMenuItem variant="destructive" onClick={() => setDeleteOpen(true)}>
-                  <Trash2Icon data-icon="inline-start" />
-                  Delete service
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          ) : null}
-        </div>
+            </div>
 
-        <ServicePackages
-          packages={service.packages}
-          sellerId={sellerId}
-          sellerName={sellerName}
-          isSelf={isSelf}
-          fallbackPrice={service.startingPrice}
-          fallbackDeliveryDays={service.deliveryDays}
-        />
+            {hasMeta ? (
+              <div className="flex flex-col gap-3">
+                {service.tags.length > 0 ? (
+                  <div className="flex items-center gap-3">
+                    <span className="shrink-0 text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                      Focus
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {service.tags.map((tag) => (
+                        <Badge key={tag} variant="secondary">
+                          {tag}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
 
-        {hasMeta ? (
-          <div className="flex flex-col gap-3">
-            {service.tags.length > 0 ? (
-              <div className="flex items-center gap-3">
-                <span className="shrink-0 text-xs font-medium tracking-wide text-muted-foreground uppercase">
-                  Focus
-                </span>
-                <div className="flex flex-wrap gap-1.5">
-                  {service.tags.map((tag) => (
-                    <Badge key={tag} variant="secondary">
-                      {tag}
-                    </Badge>
-                  ))}
+            {descriptionHtml ? (
+              <div className="border-t border-border pt-6">
+                <h2 className="mb-3 font-heading text-sm font-semibold tracking-tight text-foreground">
+                  About this service
+                </h2>
+                <div
+                  className="prose-post max-w-none text-pretty text-foreground"
+                  dangerouslySetInnerHTML={{ __html: descriptionHtml }}
+                />
+              </div>
+            ) : null}
+
+            {service.gallery.length > 0 ? (
+              <div className="flex flex-col gap-3 border-t border-border pt-6">
+                <h2 className="font-heading text-sm font-semibold tracking-tight text-foreground">
+                  Gallery
+                </h2>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  {service.gallery.map((item, index) => {
+                    // Cover (if any) occupies lightbox index 0, so gallery
+                    // items are offset by one in the shared item list.
+                    const lightboxItemIndex = service.coverImage ? index + 1 : index
+                    return (
+                      <button
+                        key={item.url}
+                        type="button"
+                        onClick={() => setLightboxIndex(lightboxItemIndex)}
+                        aria-label={`View ${item.type === "video" ? "video" : item.type === "gif" ? "GIF" : "image"} ${index + 1} for ${service.title}`}
+                        className="group relative aspect-square overflow-hidden rounded-xl border border-border bg-muted"
+                      >
+                        {item.type === "video" ? (
+                          <>
+                            <video
+                              src={item.url}
+                              muted
+                              playsInline
+                              preload="metadata"
+                              className="absolute inset-0 size-full object-cover"
+                              aria-hidden="true"
+                            />
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/10 transition-colors group-hover:bg-black/20">
+                              <span className="flex size-8 items-center justify-center rounded-full bg-background/90 text-foreground shadow-sm">
+                                <PlayIcon className="size-3.5 fill-current" aria-hidden="true" />
+                              </span>
+                            </div>
+                          </>
+                        ) : (
+                          <Image
+                            src={item.url}
+                            alt={`Gallery ${item.type === "gif" ? "GIF" : "image"} ${index + 1} for ${service.title}`}
+                            fill
+                            unoptimized
+                            className="object-cover transition-transform duration-300 group-hover:scale-105"
+                          />
+                        )}
+                        {item.type === "gif" ? (
+                          <span className="absolute bottom-1.5 left-1.5 rounded bg-background/80 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-foreground backdrop-blur-sm">
+                            GIF
+                          </span>
+                        ) : null}
+                      </button>
+                    )
+                  })}
                 </div>
               </div>
             ) : null}
           </div>
-        ) : null}
 
-        {descriptionHtml ? (
-          <div
-            className="prose-post max-w-none text-pretty text-foreground"
-            dangerouslySetInnerHTML={{ __html: descriptionHtml }}
-          />
-        ) : null}
-
-        {service.gallery.length > 0 ? (
-          <div className="flex flex-col gap-3">
-            <h2 className="font-heading text-sm font-semibold tracking-tight text-foreground">
-              Gallery
-            </h2>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-              {service.gallery.map((item, index) => {
-                // Cover (if any) occupies lightbox index 0, so gallery
-                // items are offset by one in the shared item list.
-                const lightboxItemIndex = service.coverImage ? index + 1 : index
-                return (
-                  <button
-                    key={item.url}
-                    type="button"
-                    onClick={() => setLightboxIndex(lightboxItemIndex)}
-                    aria-label={`View ${item.type === "video" ? "video" : item.type === "gif" ? "GIF" : "image"} ${index + 1} for ${service.title}`}
-                    className="group relative aspect-square overflow-hidden rounded-xl border border-border bg-muted"
-                  >
-                    {item.type === "video" ? (
-                      <>
-                        <video
-                          src={item.url}
-                          muted
-                          playsInline
-                          preload="metadata"
-                          className="absolute inset-0 size-full object-cover"
-                          aria-hidden="true"
-                        />
-                        <div className="absolute inset-0 flex items-center justify-center bg-black/10 transition-colors group-hover:bg-black/20">
-                          <span className="flex size-8 items-center justify-center rounded-full bg-background/90 text-foreground shadow-sm">
-                            <PlayIcon className="size-3.5 fill-current" aria-hidden="true" />
-                          </span>
-                        </div>
-                      </>
-                    ) : (
-                      <Image
-                        src={item.url}
-                        alt={`Gallery ${item.type === "gif" ? "GIF" : "image"} ${index + 1} for ${service.title}`}
-                        fill
-                        unoptimized
-                        className="object-cover transition-transform duration-300 group-hover:scale-105"
-                      />
-                    )}
-                    {item.type === "gif" ? (
-                      <span className="absolute bottom-1.5 left-1.5 rounded bg-background/80 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-foreground backdrop-blur-sm">
-                        GIF
-                      </span>
-                    ) : null}
-                  </button>
-                )
-              })}
-            </div>
+          {/* Sticky booking rail — desktop/tablet only; offset below the
+              app's own sticky page header so both stay visible together. */}
+          <div className="hidden lg:sticky lg:top-20 lg:order-2 lg:flex lg:flex-col lg:gap-4">
+            <ServicePackages
+              packages={service.packages}
+              sellerId={sellerId}
+              sellerName={sellerName}
+              isSelf={isSelf}
+              fallbackPrice={service.startingPrice}
+              fallbackDeliveryDays={service.deliveryDays}
+            />
+            <a
+              href={`/profile/${profileIdentifier}`}
+              className="flex items-center gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm transition-colors hover:bg-muted/40"
+            >
+              <span className="relative flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted text-sm font-semibold text-foreground">
+                {sellerImage ? (
+                  <Image
+                    src={sellerImage}
+                    alt={sellerName}
+                    fill
+                    unoptimized
+                    className="object-cover"
+                  />
+                ) : (
+                  sellerName
+                    .split(" ")
+                    .map((part) => part[0])
+                    .slice(0, 2)
+                    .join("")
+                    .toUpperCase()
+                )}
+              </span>
+              <span className="min-w-0">
+                <span className="block truncate text-sm font-semibold text-foreground">{sellerName}</span>
+                <span className="block text-xs text-muted-foreground">View seller profile</span>
+              </span>
+            </a>
           </div>
-        ) : null}
+        </div>
       </div>
 
       <MediaLightbox
