@@ -252,6 +252,12 @@ export const services = pgTable("services", {
   // JSON-encoded TEXT array of `{ url, type }` MediaAttachment objects,
   // same convention as portfolioProjects.gallery.
   gallery: text("gallery"),
+  // JSON-encoded TEXT array of `ServicePackage` tiers (name, price,
+  // deliveryDays, description, features) — Fiverr-style Basic/
+  // Standard/Premium pricing packages. Optional: a listing with no
+  // packages falls back to the flat startingPrice/deliveryDays.
+  // Added after the table already existed in prior environments.
+  packages: text("packages"),
   sortOrder: integer("sortOrder").notNull().default(0),
   createdAt: timestamp("createdAt").notNull().defaultNow(),
   updatedAt: timestamp("updatedAt").notNull().defaultNow(),
