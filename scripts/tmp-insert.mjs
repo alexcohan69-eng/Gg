@@ -9,6 +9,13 @@ const signer = new DsqlSigner({
 const token = await signer.getDbConnectAdminAuthToken()
 const client = new Client({ host: process.env.PGHOST, port: 5432, user: process.env.PGUSER || "admin", password: token, database: process.env.PGDATABASE || "postgres", ssl: { rejectUnauthorized: false } })
 await client.connect()
-const res = await client.query(`select id, username, name from "user" where id = 'CGNOS5RhZvY5oEO0ACqfkNdmSXMvM5R9'`)
-console.log(JSON.stringify(res.rows, null, 2))
+const u = await client.query(`select id from "user" where username = 'qatester456'`)
+const userId = u.rows[0].id
+const id = "qa-video-project-1"
+await client.query(
+  `insert into "portfolioProjects" (id, "userId", title, tagline, "coverImage", "coverImageType", tags, gallery, "sortOrder", "createdAt", "updatedAt")
+   values ($1, $2, 'Video Cover QA', 'Testing responsive video cover', $3, 'video', '[]', '[]', 0, now(), now())`,
+  [id, userId, "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4"]
+)
+console.log("inserted", id, "for user", userId)
 await client.end()

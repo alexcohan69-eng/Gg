@@ -105,7 +105,7 @@ export function PortfolioProjectDetail({
                 playsInline
                 disablePictureInPicture
                 preload="auto"
-                className="size-full object-cover"
+                className="absolute inset-0 size-full object-cover"
                 aria-hidden="true"
               />
               <span className="absolute bottom-3 left-3 flex items-center gap-1 rounded bg-background/80 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-foreground backdrop-blur-sm">
@@ -247,7 +247,7 @@ export function PortfolioProjectDetail({
                           muted
                           playsInline
                           preload="metadata"
-                          className="size-full object-cover"
+                          className="absolute inset-0 size-full object-cover"
                           aria-hidden="true"
                         />
                         <div className="absolute inset-0 flex items-center justify-center bg-black/10 transition-colors group-hover:bg-black/20">
