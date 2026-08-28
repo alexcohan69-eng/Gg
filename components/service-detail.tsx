@@ -52,6 +52,7 @@ export function ServiceDetail({
   sellerName,
   sellerImage,
   isSelf,
+  testimonials,
 }: {
   service: Service
   profileIdentifier: string
@@ -59,6 +60,7 @@ export function ServiceDetail({
   sellerName: string
   sellerImage: string | null
   isSelf: boolean
+  testimonials: Testimonial[]
 }) {
   const router = useRouter()
   const [editOpen, setEditOpen] = useState(false)
@@ -312,6 +314,8 @@ export function ServiceDetail({
               }
               hasPackages={service.packages.length > 0}
             />
+
+            <ClientReviewsSection testimonials={testimonials} profileIdentifier={profileIdentifier} />
           </div>
 
           {/* Sticky booking rail — desktop/tablet only; offset below the

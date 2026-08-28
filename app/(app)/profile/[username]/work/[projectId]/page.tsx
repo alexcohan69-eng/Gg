@@ -3,6 +3,7 @@ import { headers } from "next/headers"
 import { notFound, redirect } from "next/navigation"
 import { getSessionWithRetry } from "@/lib/auth"
 import { getPortfolioProject } from "@/lib/portfolio"
+import { getTestimonialsForProject } from "@/lib/testimonials"
 import { getProfileByIdentifier } from "@/lib/follows"
 import { profileHref } from "@/lib/utils"
 import { PageHeader } from "@/components/page-header"
@@ -45,6 +46,7 @@ export default async function PortfolioProjectPage({
   if (!project) notFound()
 
   const isSelf = profile.id === session.user.id
+  const testimonials = await getTestimonialsForProject(profile.id, projectId)
 
   return (
     <div className="flex flex-col">
@@ -54,6 +56,7 @@ export default async function PortfolioProjectPage({
         project={project}
         profileIdentifier={username}
         isSelf={isSelf}
+        testimonials={testimonials}
       />
     </div>
   )
