@@ -285,6 +285,9 @@ const statements = [
     "updatedAt" timestamp not null default now()
   )`,
   `create index async if not exists testimonials_userId_sortOrder_idx on "testimonials" ("userId", "sortOrder")`,
+  // Added after the table already existed in prior environments —
+  // JSON-encoded array of proof photo/video MediaAttachment objects.
+  `alter table "testimonials" add column if not exists media text`,
 
   // Moderation MVP: blocks + reports
   `create table if not exists "blocks" (

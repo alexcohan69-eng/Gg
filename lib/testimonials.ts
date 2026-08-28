@@ -1,6 +1,7 @@
 import { and, asc, eq } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { testimonials } from "@/lib/db/schema"
+import { parseMediaColumn, type MediaAttachment } from "@/lib/media"
 
 export type Testimonial = {
   id: string
@@ -11,18 +12,27 @@ export type Testimonial = {
   rating: number | null
   content: string
   projectTitle: string | null
+  media: MediaAttachment[]
   sortOrder: number
   createdAt: Date
   updatedAt: Date
 }
 
+type TestimonialRow = Omit<Testimonial, "media"> & { media: string | null }
+
+function rowToTestimonial(row: TestimonialRow): Testimonial {
+  return { ...row, media: parseMediaColumn(row.media) }
+}
+
 /** All of a profile's testimonials for the Testimonials tab grid, in manual sort order. */
 export async function getTestimonials(userId: string): Promise<Testimonial[]> {
-  return db
+  const rows = await db
     .select()
     .from(testimonials)
     .where(eq(testimonials.userId, userId))
     .orderBy(asc(testimonials.sortOrder))
+
+  return rows.map(rowToTestimonial)
 }
 
 /** A single testimonial. Returns null if missing or not owned by that user. */
@@ -33,5 +43,5 @@ export async function getTestimonial(userId: string, id: string): Promise<Testim
     .where(and(eq(testimonials.id, id), eq(testimonials.userId, userId)))
     .limit(1)
 
-  return rows[0] ?? null
+  return rows[0] ? rowToTestimonial(rows[0]) : null
 }
