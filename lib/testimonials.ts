@@ -6,6 +6,10 @@ import { parseMediaColumn, type MediaAttachment } from "@/lib/media"
 export type Testimonial = {
   id: string
   userId: string
+  // At most one of the two is ever set — a testimonial is about
+  // either a service listing or a portfolio case study, not both.
+  serviceId: string | null
+  projectId: string | null
   authorName: string
   authorTitle: string | null
   authorAvatar: string | null
@@ -44,4 +48,34 @@ export async function getTestimonial(userId: string, id: string): Promise<Testim
     .limit(1)
 
   return rows[0] ? rowToTestimonial(rows[0]) : null
+}
+
+/**
+ * Testimonials linked to a specific service listing, in manual sort
+ * order — rendered as the "Client reviews" section on that service's
+ * detail page.
+ */
+export async function getTestimonialsForService(userId: string, serviceId: string): Promise<Testimonial[]> {
+  const rows = await db
+    .select()
+    .from(testimonials)
+    .where(and(eq(testimonials.userId, userId), eq(testimonials.serviceId, serviceId)))
+    .orderBy(asc(testimonials.sortOrder))
+
+  return rows.map(rowToTestimonial)
+}
+
+/**
+ * Testimonials linked to a specific portfolio project, in manual sort
+ * order — rendered as the "Client reviews" section on that project's
+ * detail page.
+ */
+export async function getTestimonialsForProject(userId: string, projectId: string): Promise<Testimonial[]> {
+  const rows = await db
+    .select()
+    .from(testimonials)
+    .where(and(eq(testimonials.userId, userId), eq(testimonials.projectId, projectId)))
+    .orderBy(asc(testimonials.sortOrder))
+
+  return rows.map(rowToTestimonial)
 }

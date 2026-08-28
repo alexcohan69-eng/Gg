@@ -16,7 +16,9 @@ import {
 import { deletePortfolioProject } from "@/app/actions/portfolio"
 import { sanitizePostHtml } from "@/lib/sanitize-html"
 import type { PortfolioProject } from "@/lib/portfolio"
+import type { Testimonial } from "@/lib/testimonials"
 import { PortfolioProjectDialog } from "@/components/portfolio-project-editor"
+import { ClientReviewsSection } from "@/components/client-reviews-section"
 import { MediaLightbox } from "@/components/media-lightbox"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -43,10 +45,12 @@ export function PortfolioProjectDetail({
   project,
   profileIdentifier,
   isSelf,
+  testimonials,
 }: {
   project: PortfolioProject
   profileIdentifier: string
   isSelf: boolean
+  testimonials: Testimonial[]
 }) {
   const router = useRouter()
   const [editOpen, setEditOpen] = useState(false)
@@ -271,6 +275,8 @@ export function PortfolioProjectDetail({
             </div>
           </div>
         ) : null}
+
+        <ClientReviewsSection testimonials={testimonials} profileIdentifier={profileIdentifier} />
       </div>
 
       <MediaLightbox

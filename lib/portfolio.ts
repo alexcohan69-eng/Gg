@@ -91,6 +91,21 @@ export async function getPortfolioProjects(userId: string): Promise<PortfolioPro
   return rows.map(toPortfolioProject)
 }
 
+/**
+ * Lightweight `{ id, title }` list of a profile's case studies, used
+ * to populate the "link this testimonial to a project" picker in the
+ * testimonial editor without loading each project's full gallery.
+ */
+export async function getPortfolioProjectOptions(userId: string): Promise<{ id: string; title: string }[]> {
+  const rows = await db
+    .select({ id: portfolioProjects.id, title: portfolioProjects.title })
+    .from(portfolioProjects)
+    .where(eq(portfolioProjects.userId, userId))
+    .orderBy(asc(portfolioProjects.sortOrder))
+
+  return rows
+}
+
 /** A single case study for the detail page. Returns null if missing or not owned by that user. */
 export async function getPortfolioProject(
   userId: string,

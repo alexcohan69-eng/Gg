@@ -16,11 +16,13 @@ import {
 import { deleteService } from "@/app/actions/services"
 import { sanitizePostHtml } from "@/lib/sanitize-html"
 import type { Service } from "@/lib/services"
+import type { Testimonial } from "@/lib/testimonials"
 import { ServiceDialog } from "@/components/service-editor"
 import { ServicePackages } from "@/components/service-packages"
 import { ServiceIncludes } from "@/components/service-includes"
 import { ServiceProcess } from "@/components/service-process"
 import { ServiceFaq } from "@/components/service-faq"
+import { ClientReviewsSection } from "@/components/client-reviews-section"
 import { MediaLightbox } from "@/components/media-lightbox"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -50,6 +52,7 @@ export function ServiceDetail({
   sellerName,
   sellerImage,
   isSelf,
+  testimonials,
 }: {
   service: Service
   profileIdentifier: string
@@ -57,6 +60,7 @@ export function ServiceDetail({
   sellerName: string
   sellerImage: string | null
   isSelf: boolean
+  testimonials: Testimonial[]
 }) {
   const router = useRouter()
   const [editOpen, setEditOpen] = useState(false)
@@ -310,6 +314,8 @@ export function ServiceDetail({
               }
               hasPackages={service.packages.length > 0}
             />
+
+            <ClientReviewsSection testimonials={testimonials} profileIdentifier={profileIdentifier} />
           </div>
 
           {/* Sticky booking rail — desktop/tablet only; offset below the

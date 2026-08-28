@@ -3,6 +3,7 @@ import { headers } from "next/headers"
 import { notFound, redirect } from "next/navigation"
 import { getSessionWithRetry } from "@/lib/auth"
 import { getService } from "@/lib/services"
+import { getTestimonialsForService } from "@/lib/testimonials"
 import { getProfileByIdentifier } from "@/lib/follows"
 import { profileHref } from "@/lib/utils"
 import { PageHeader } from "@/components/page-header"
@@ -45,6 +46,7 @@ export default async function ServiceDetailPage({
   if (!service) notFound()
 
   const isSelf = profile.id === session.user.id
+  const testimonials = await getTestimonialsForService(profile.id, serviceId)
 
   return (
     <div className="flex flex-col">
@@ -57,6 +59,7 @@ export default async function ServiceDetailPage({
         sellerName={profile.name}
         sellerImage={profile.image}
         isSelf={isSelf}
+        testimonials={testimonials}
       />
     </div>
   )

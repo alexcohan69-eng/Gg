@@ -6,7 +6,7 @@ import { del } from "@vercel/blob"
 import { and, eq } from "drizzle-orm"
 import { getSessionWithRetry } from "@/lib/auth"
 import { db } from "@/lib/db"
-import { testimonials } from "@/lib/db/schema"
+import { services, portfolioProjects, testimonials } from "@/lib/db/schema"
 import {
   mediaUrlToPathname,
   validateGalleryMedia,
@@ -30,6 +30,12 @@ export type ActionResult = {
 function revalidateTestimonials() {
   revalidatePath("/profile")
   revalidatePath("/profile/[username]/testimonials", "page")
+  // A testimonial's "Client reviews" section can live on a service or
+  // project detail page (see lib/testimonials.ts's
+  // getTestimonialsForService/Project), so any add/edit/delete/reorder
+  // needs to bust those too, not just the Testimonials tab itself.
+  revalidatePath("/profile/[username]/services/[serviceId]", "page")
+  revalidatePath("/profile/[username]/work/[projectId]", "page")
 }
 
 const MAX_AUTHOR_NAME = 60
@@ -63,6 +69,37 @@ async function assertOwnsTestimonial(userId: string, id: string) {
   if (rows.length === 0) throw new Error("Not found")
 }
 
+/**
+ * Validates a client-submitted serviceId/projectId link against the
+ * owner's own rows — a testimonial can only be attached to a service
+ * or project the same user actually owns, never someone else's (or a
+ * stale/deleted id, which is silently dropped rather than erroring so
+ * a race with a concurrent delete doesn't block the save).
+ */
+async function resolveTestimonialLink(
+  userId: string,
+  serviceId: string | null,
+  projectId: string | null,
+): Promise<{ serviceId: string | null; projectId: string | null }> {
+  if (serviceId) {
+    const rows = await db
+      .select({ id: services.id })
+      .from(services)
+      .where(and(eq(services.id, serviceId), eq(services.userId, userId)))
+      .limit(1)
+    return { serviceId: rows[0] ? serviceId : null, projectId: null }
+  }
+  if (projectId) {
+    const rows = await db
+      .select({ id: portfolioProjects.id })
+      .from(portfolioProjects)
+      .where(and(eq(portfolioProjects.id, projectId), eq(portfolioProjects.userId, userId)))
+      .limit(1)
+    return { serviceId: null, projectId: rows[0] ? projectId : null }
+  }
+  return { serviceId: null, projectId: null }
+}
+
 function parseTestimonialForm(formData: FormData):
   | {
       authorName: string
@@ -72,6 +109,8 @@ function parseTestimonialForm(formData: FormData):
       content: string
       projectTitle: string | null
       media: MediaAttachment[]
+      serviceId: string | null
+      projectId: string | null
     }
   | { error: string } {
   const authorName = String(formData.get("authorName") ?? "").trim()
@@ -79,6 +118,13 @@ function parseTestimonialForm(formData: FormData):
   const authorAvatar = String(formData.get("authorAvatar") ?? "").trim() || null
   const projectTitle = String(formData.get("projectTitle") ?? "").trim() || null
   const contentHtml = String(formData.get("content") ?? "")
+  // "link" is a single "service:<id>" / "project:<id>" value from the
+  // editor's picker (a testimonial links to at most one of the two),
+  // resolved and ownership-checked separately in resolveTestimonialLink.
+  const linkRaw = String(formData.get("link") ?? "").trim()
+  const [linkKind, linkId] = linkRaw.includes(":") ? linkRaw.split(":", 2) : ["", ""]
+  const requestedServiceId = linkKind === "service" && linkId ? linkId : null
+  const requestedProjectId = linkKind === "project" && linkId ? linkId : null
 
   const ratingRaw = String(formData.get("rating") ?? "").trim()
   const rating = ratingRaw ? Number(ratingRaw) : null
@@ -122,7 +168,17 @@ function parseTestimonialForm(formData: FormData):
     return { error: `Testimonial must be ${MAX_CONTENT_TEXT} characters or fewer.` }
   }
 
-  return { authorName, authorTitle, authorAvatar, rating, content: sanitizedContent, projectTitle, media }
+  return {
+    authorName,
+    authorTitle,
+    authorAvatar,
+    rating,
+    content: sanitizedContent,
+    projectTitle,
+    media,
+    serviceId: requestedServiceId,
+    projectId: requestedProjectId,
+  }
 }
 
 /** Adds a new testimonial to the end of the profile's Testimonials tab. */
@@ -141,9 +197,13 @@ export async function addTestimonial(formData: FormData): Promise<ActionResult> 
     return { success: false, error: `You can add up to ${MAX_TESTIMONIALS} testimonials.` }
   }
 
+  const link = await resolveTestimonialLink(userId, parsed.serviceId, parsed.projectId)
+
   await db.insert(testimonials).values({
     id: crypto.randomUUID(),
     userId,
+    serviceId: link.serviceId,
+    projectId: link.projectId,
     authorName: parsed.authorName,
     authorTitle: parsed.authorTitle,
     authorAvatar: parsed.authorAvatar,
@@ -173,9 +233,13 @@ export async function updateTestimonial(id: string, formData: FormData): Promise
   const parsed = parseTestimonialForm(formData)
   if ("error" in parsed) return { success: false, error: parsed.error }
 
+  const link = await resolveTestimonialLink(userId, parsed.serviceId, parsed.projectId)
+
   await db
     .update(testimonials)
     .set({
+      serviceId: link.serviceId,
+      projectId: link.projectId,
       authorName: parsed.authorName,
       authorTitle: parsed.authorTitle,
       authorAvatar: parsed.authorAvatar,

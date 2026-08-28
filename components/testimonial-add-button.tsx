@@ -13,7 +13,15 @@ import { Button } from "@/components/ui/button"
  * without first scrolling past the profile card and empty state.
  * Mirrors ServiceAddButton/WorkAddButton — same dialog, same cap.
  */
-export function TestimonialAddButton({ testimonialCount }: { testimonialCount: number }) {
+export function TestimonialAddButton({
+  testimonialCount,
+  serviceOptions = [],
+  projectOptions = [],
+}: {
+  testimonialCount: number
+  serviceOptions?: { id: string; title: string }[]
+  projectOptions?: { id: string; title: string }[]
+}) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const atLimit = testimonialCount >= MAX_TESTIMONIALS
@@ -32,7 +40,13 @@ export function TestimonialAddButton({ testimonialCount }: { testimonialCount: n
         <PlusIcon />
       </Button>
 
-      <TestimonialDialog open={open} onOpenChange={setOpen} onSaved={() => router.refresh()} />
+      <TestimonialDialog
+        open={open}
+        onOpenChange={setOpen}
+        onSaved={() => router.refresh()}
+        serviceOptions={serviceOptions}
+        projectOptions={projectOptions}
+      />
     </>
   )
 }
