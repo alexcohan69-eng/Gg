@@ -5,6 +5,7 @@ const TABS = [
   { key: "posts", label: "Posts", suffix: "" },
   { key: "work", label: "Work", suffix: "/work" },
   { key: "services", label: "Services", suffix: "/services" },
+  { key: "testimonials", label: "Testimonials", suffix: "/testimonials" },
   { key: "about", label: "About", suffix: "/about" },
 ] as const
 
@@ -21,7 +22,7 @@ export function ProfileTabs({
   current,
 }: {
   identifier: string
-  current: "posts" | "work" | "services" | "about"
+  current: "posts" | "work" | "services" | "testimonials" | "about"
 }) {
   return (
     <nav

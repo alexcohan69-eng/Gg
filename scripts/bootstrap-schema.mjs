@@ -271,6 +271,21 @@ const statements = [
   // JSON-encoded array of Basic/Standard/Premium pricing packages.
   `alter table "services" add column if not exists "packages" text`,
 
+  `create table if not exists "testimonials" (
+    id text primary key,
+    "userId" text not null,
+    "authorName" text not null,
+    "authorTitle" text,
+    "authorAvatar" text,
+    rating integer,
+    content text not null,
+    "projectTitle" text,
+    "sortOrder" integer not null default 0,
+    "createdAt" timestamp not null default now(),
+    "updatedAt" timestamp not null default now()
+  )`,
+  `create index async if not exists testimonials_userId_sortOrder_idx on "testimonials" ("userId", "sortOrder")`,
+
   // Moderation MVP: blocks + reports
   `create table if not exists "blocks" (
     id text primary key,

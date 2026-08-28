@@ -163,7 +163,8 @@ export function mediaUrlToPathname(url: string): string | null {
     return pathname &&
       (pathname.startsWith("posts/") ||
         pathname.startsWith("portfolio/") ||
-        pathname.startsWith("services/"))
+        pathname.startsWith("services/") ||
+        pathname.startsWith("testimonials/"))
       ? pathname
       : null
   } catch {
