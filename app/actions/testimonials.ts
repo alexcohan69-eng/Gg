@@ -7,7 +7,13 @@ import { and, eq } from "drizzle-orm"
 import { getSessionWithRetry } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { testimonials } from "@/lib/db/schema"
-import { mediaUrlToPathname } from "@/lib/media"
+import {
+  mediaUrlToPathname,
+  validateGalleryMedia,
+  type MediaAttachment,
+  type MediaType,
+} from "@/lib/media"
+import { sanitizePostHtml, stripHtmlToText } from "@/lib/sanitize-html"
 import { logActionError } from "@/lib/log-action-error"
 
 async function getUserId() {
@@ -29,10 +35,24 @@ function revalidateTestimonials() {
 const MAX_AUTHOR_NAME = 60
 const MAX_AUTHOR_TITLE = 80
 const MAX_PROJECT_TITLE = 80
-const MAX_CONTENT = 600
+const MAX_CONTENT_TEXT = 600
 const MAX_TESTIMONIALS = 30
 const MIN_RATING = 1
 const MAX_RATING = 5
+
+const MEDIA_TYPES: MediaType[] = ["image", "gif", "video"]
+function isMediaType(value: unknown): value is MediaType {
+  return typeof value === "string" && (MEDIA_TYPES as string[]).includes(value)
+}
+
+/** Parses a client-submitted `{ url, type }` media value, dropping anything malformed. */
+function parseMediaAttachment(value: unknown): MediaAttachment | null {
+  if (!value || typeof value !== "object") return null
+  const url = "url" in value ? String((value as { url: unknown }).url ?? "").trim() : ""
+  const type = "type" in value ? (value as { type: unknown }).type : "image"
+  if (!url) return null
+  return { url, type: isMediaType(type) ? type : "image" }
+}
 
 async function assertOwnsTestimonial(userId: string, id: string) {
   const rows = await db
@@ -51,16 +71,30 @@ function parseTestimonialForm(formData: FormData):
       rating: number | null
       content: string
       projectTitle: string | null
+      media: MediaAttachment[]
     }
   | { error: string } {
   const authorName = String(formData.get("authorName") ?? "").trim()
   const authorTitle = String(formData.get("authorTitle") ?? "").trim() || null
   const authorAvatar = String(formData.get("authorAvatar") ?? "").trim() || null
   const projectTitle = String(formData.get("projectTitle") ?? "").trim() || null
-  const content = String(formData.get("content") ?? "").trim()
+  const contentHtml = String(formData.get("content") ?? "")
 
   const ratingRaw = String(formData.get("rating") ?? "").trim()
   const rating = ratingRaw ? Number(ratingRaw) : null
+
+  let media: MediaAttachment[] = []
+  const mediaRaw = String(formData.get("media") ?? "[]")
+  try {
+    const parsed = JSON.parse(mediaRaw)
+    if (Array.isArray(parsed)) {
+      media = parsed
+        .map((item) => parseMediaAttachment(item))
+        .filter((item): item is MediaAttachment => item !== null)
+    }
+  } catch {
+    return { error: "Invalid media." }
+  }
 
   if (!authorName || authorName.length > MAX_AUTHOR_NAME) {
     return { error: `Client name is required and must be ${MAX_AUTHOR_NAME} characters or fewer.` }
@@ -71,14 +105,24 @@ function parseTestimonialForm(formData: FormData):
   if (projectTitle && projectTitle.length > MAX_PROJECT_TITLE) {
     return { error: `Project label must be ${MAX_PROJECT_TITLE} characters or fewer.` }
   }
-  if (!content || content.length > MAX_CONTENT) {
-    return { error: `Testimonial is required and must be ${MAX_CONTENT} characters or fewer.` }
-  }
   if (rating !== null && (!Number.isFinite(rating) || !Number.isInteger(rating) || rating < MIN_RATING || rating > MAX_RATING)) {
     return { error: `Rating must be a whole number between ${MIN_RATING} and ${MAX_RATING}.` }
   }
+  const mediaError = validateGalleryMedia(media)
+  if (mediaError) {
+    return { error: mediaError }
+  }
 
-  return { authorName, authorTitle, authorAvatar, rating, content, projectTitle }
+  const sanitizedContent = sanitizePostHtml(contentHtml)
+  const contentText = stripHtmlToText(sanitizedContent)
+  if (!contentText) {
+    return { error: "Testimonial is required." }
+  }
+  if (contentText.length > MAX_CONTENT_TEXT) {
+    return { error: `Testimonial must be ${MAX_CONTENT_TEXT} characters or fewer.` }
+  }
+
+  return { authorName, authorTitle, authorAvatar, rating, content: sanitizedContent, projectTitle, media }
 }
 
 /** Adds a new testimonial to the end of the profile's Testimonials tab. */
@@ -106,6 +150,7 @@ export async function addTestimonial(formData: FormData): Promise<ActionResult> 
     rating: parsed.rating,
     content: parsed.content,
     projectTitle: parsed.projectTitle,
+    media: JSON.stringify(parsed.media),
     sortOrder: existing.length,
   })
 
@@ -120,7 +165,7 @@ export async function updateTestimonial(id: string, formData: FormData): Promise
   await assertOwnsTestimonial(userId, id)
 
   const existingRows = await db
-    .select({ authorAvatar: testimonials.authorAvatar })
+    .select({ authorAvatar: testimonials.authorAvatar, media: testimonials.media })
     .from(testimonials)
     .where(and(eq(testimonials.id, id), eq(testimonials.userId, userId)))
     .limit(1)
@@ -137,20 +182,35 @@ export async function updateTestimonial(id: string, formData: FormData): Promise
       rating: parsed.rating,
       content: parsed.content,
       projectTitle: parsed.projectTitle,
+      media: JSON.stringify(parsed.media),
       updatedAt: new Date(),
     })
     .where(and(eq(testimonials.id, id), eq(testimonials.userId, userId)))
 
-  // Best-effort cleanup of a replaced avatar. A failure here shouldn't
-  // fail the update — the row is already saved.
-  const previousAvatar = existingRows[0]?.authorAvatar
-  if (previousAvatar && previousAvatar !== parsed.authorAvatar) {
-    const pathname = mediaUrlToPathname(previousAvatar)
-    if (pathname) {
+  // Best-effort cleanup of any media that was removed (replaced
+  // avatar, deleted gallery items). A failure here shouldn't fail the
+  // update — the row is already saved.
+  const previous = existingRows[0]
+  if (previous) {
+    const previousGallery = (JSON.parse(previous.media || "[]") as unknown[]).map((item) =>
+      typeof item === "string" ? item : (item as { url?: string })?.url,
+    )
+    const previousUrls = [previous.authorAvatar, ...previousGallery].filter(
+      (url): url is string => typeof url === "string" && url.length > 0,
+    )
+    const nextUrls = new Set(
+      [parsed.authorAvatar, ...parsed.media.map((item) => item.url)].filter(Boolean),
+    )
+    const removedPathnames = previousUrls
+      .filter((url) => !nextUrls.has(url))
+      .map((url) => mediaUrlToPathname(url))
+      .filter((p): p is string => p !== null)
+
+    if (removedPathnames.length) {
       try {
-        await del(pathname)
+        await del(removedPathnames)
       } catch (error) {
-        logActionError("updateTestimonialAvatar", error, { userId, id })
+        logActionError("updateTestimonialMedia", error, { userId, id })
       }
     }
   }
@@ -166,21 +226,33 @@ export async function deleteTestimonial(id: string): Promise<ActionResult> {
   await assertOwnsTestimonial(userId, id)
 
   const rows = await db
-    .select({ authorAvatar: testimonials.authorAvatar })
+    .select({ authorAvatar: testimonials.authorAvatar, media: testimonials.media })
     .from(testimonials)
     .where(and(eq(testimonials.id, id), eq(testimonials.userId, userId)))
     .limit(1)
 
   await db.delete(testimonials).where(and(eq(testimonials.id, id), eq(testimonials.userId, userId)))
 
-  const avatar = rows[0]?.authorAvatar
-  if (avatar) {
-    const pathname = mediaUrlToPathname(avatar)
-    if (pathname) {
+  // Best-effort cleanup of the testimonial's uploaded avatar + proof
+  // media. A failure here shouldn't fail the delete — the row is
+  // already gone.
+  const row = rows[0]
+  if (row) {
+    const gallery = (JSON.parse(row.media || "[]") as unknown[]).map((item) =>
+      typeof item === "string" ? item : (item as { url?: string })?.url,
+    )
+    const urls = [row.authorAvatar, ...gallery].filter(
+      (url): url is string => typeof url === "string" && url.length > 0,
+    )
+    const pathnames = urls
+      .map((url) => mediaUrlToPathname(url))
+      .filter((p): p is string => p !== null)
+
+    if (pathnames.length) {
       try {
-        await del(pathname)
+        await del(pathnames)
       } catch (error) {
-        logActionError("deleteTestimonialAvatar", error, { userId, id })
+        logActionError("deleteTestimonialMedia", error, { userId, id })
       }
     }
   }

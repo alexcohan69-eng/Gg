@@ -280,9 +280,18 @@ export const testimonials = pgTable("testimonials", {
   authorAvatar: text("authorAvatar"),
   // 1-5, optional — a testimonial can omit a star rating.
   rating: integer("rating"),
+  // Sanitized rich-text HTML from the same Tiptap editor used by the
+  // service/portfolio descriptions — supports bold/italic/lists/quote/
+  // links and inline images, not just a plain quote string.
   content: text("content").notNull(),
   // Optional label for what the testimonial is about, e.g. "Brand redesign".
   projectTitle: text("projectTitle"),
+  // JSON-encoded TEXT array of `{ url, type }` MediaAttachment objects,
+  // same convention as portfolioProjects.gallery/services.gallery —
+  // optional proof photos/videos (e.g. a screenshot of the client's
+  // message, before/after shots) attached to the quote. Added after
+  // the table already existed in prior environments.
+  media: text("media"),
   sortOrder: integer("sortOrder").notNull().default(0),
   createdAt: timestamp("createdAt").notNull().defaultNow(),
   updatedAt: timestamp("updatedAt").notNull().defaultNow(),
