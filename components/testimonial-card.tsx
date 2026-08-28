@@ -2,12 +2,11 @@
 
 import { useState } from "react"
 import Image from "next/image"
-import { PlayIcon, QuoteIcon, StarIcon } from "lucide-react"
+import { BriefcaseIcon, PlayIcon, StarIcon } from "lucide-react"
 import type { Testimonial } from "@/lib/testimonials"
 import { sanitizePostHtml } from "@/lib/sanitize-html"
 import { MediaLightbox } from "@/components/media-lightbox"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Badge } from "@/components/ui/badge"
 import { getInitials } from "@/lib/utils"
 
 /**
@@ -28,46 +27,60 @@ export function TestimonialCard({ testimonial }: { testimonial: Testimonial }) {
   const contentHtml = sanitizePostHtml(testimonial.content)
 
   return (
-    <div className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-5 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5">
-      <div className="flex items-start justify-between gap-2">
-        <QuoteIcon className="size-6 shrink-0 text-primary/30" aria-hidden="true" />
+    <div className="group/card relative flex flex-col gap-5 overflow-hidden rounded-3xl border border-border bg-card p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-primary/30 hover:shadow-xl hover:shadow-primary/10">
+      {/* Signature element: an oversized serif quotation mark, the one
+          decorative flourish this card gets — everything else stays quiet. */}
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute -top-3 right-5 font-heading text-7xl leading-none text-primary/10 transition-colors duration-300 group-hover/card:text-primary/15"
+      >
+        &rdquo;
+      </span>
+
+      <div className="flex items-start justify-between gap-3">
         {testimonial.rating ? (
-          <div className="flex items-center gap-0.5" aria-label={`${testimonial.rating} out of 5 stars`}>
+          <div
+            className="flex items-center gap-0.5 rounded-full bg-primary/10 px-2.5 py-1"
+            aria-label={`${testimonial.rating} out of 5 stars`}
+          >
             {Array.from({ length: 5 }).map((_, index) => (
               <StarIcon
                 key={index}
                 className={
                   index < testimonial.rating!
                     ? "size-3.5 fill-primary text-primary"
-                    : "size-3.5 text-muted-foreground/30"
+                    : "size-3.5 fill-transparent text-primary/25"
                 }
                 aria-hidden="true"
               />
             ))}
           </div>
+        ) : (
+          <span />
+        )}
+
+        {testimonial.projectTitle ? (
+          <span className="inline-flex max-w-[60%] items-center gap-1.5 truncate rounded-full border border-border bg-secondary/60 px-2.5 py-1 text-xs font-medium text-muted-foreground">
+            <BriefcaseIcon className="size-3 shrink-0" aria-hidden="true" />
+            <span className="truncate">{testimonial.projectTitle}</span>
+          </span>
         ) : null}
       </div>
 
       <div
-        className="prose-post line-clamp-6 flex-1 text-sm leading-relaxed text-foreground text-pretty"
+        className="prose-post relative line-clamp-6 flex-1 text-[15px] leading-relaxed text-foreground text-pretty"
         dangerouslySetInnerHTML={{ __html: contentHtml }}
       />
 
-      {testimonial.projectTitle ? (
-        <Badge variant="secondary" className="w-fit border-none bg-muted text-muted-foreground">
-          {testimonial.projectTitle}
-        </Badge>
-      ) : null}
-
       {testimonial.media.length > 0 ? (
-        <div className="-mx-5 flex flex-col gap-1.5">
+        <div className="grid grid-cols-2 gap-2">
           {testimonial.media.map((item, index) => (
             <button
               key={item.url}
               type="button"
               onClick={() => setLightboxIndex(index)}
               aria-label={`View proof media ${index + 1} from ${testimonial.authorName}`}
-              className="group relative aspect-video w-full overflow-hidden border-y border-border bg-muted"
+              className="group relative aspect-video w-full overflow-hidden rounded-xl border border-border bg-muted"
             >
               {item.type === "video" ? (
                 <>
@@ -99,13 +112,17 @@ export function TestimonialCard({ testimonial }: { testimonial: Testimonial }) {
         </div>
       ) : null}
 
-      <div className="mt-auto flex items-center gap-3 border-t border-border/70 pt-4">
-        <Avatar className="size-10">
+      <div className="mt-auto flex items-center gap-3 border-t border-border/70 pt-5">
+        <Avatar className="size-11 ring-2 ring-primary/15">
           <AvatarImage src={testimonial.authorAvatar ?? undefined} alt={testimonial.authorName} />
-          <AvatarFallback className="text-xs">{getInitials(testimonial.authorName)}</AvatarFallback>
+          <AvatarFallback className="bg-primary/10 text-xs font-semibold text-primary">
+            {getInitials(testimonial.authorName)}
+          </AvatarFallback>
         </Avatar>
         <div className="min-w-0">
-          <p className="truncate text-sm font-semibold text-foreground">{testimonial.authorName}</p>
+          <p className="truncate font-heading text-sm font-semibold tracking-tight text-foreground">
+            {testimonial.authorName}
+          </p>
           {testimonial.authorTitle ? (
             <p className="truncate text-xs text-muted-foreground">{testimonial.authorTitle}</p>
           ) : null}

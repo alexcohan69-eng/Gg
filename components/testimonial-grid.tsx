@@ -10,6 +10,7 @@ import {
   MoreHorizontalIcon,
   PencilIcon,
   PlusIcon,
+  StarIcon,
   Trash2Icon,
 } from "lucide-react"
 import { deleteTestimonial, moveTestimonial } from "@/app/actions/testimonials"
@@ -232,15 +233,34 @@ export function TestimonialGrid({
     )
   }
 
+  const averageRating =
+    testimonials.filter((t) => t.rating).length > 0
+      ? testimonials.reduce((sum, t) => sum + (t.rating ?? 0), 0) / testimonials.filter((t) => t.rating).length
+      : null
+
   return (
-    <div className="flex flex-col gap-5 p-4">
-      <div className="flex items-center justify-between gap-3 border-b border-border pb-4">
-        <div>
-          <h2 className="font-heading text-lg font-semibold tracking-tight text-foreground">Testimonials</h2>
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            {testimonials.length} {testimonials.length === 1 ? "testimonial" : "testimonials"}
-            {isSelf ? ` · ${MAX_TESTIMONIALS - testimonials.length} remaining` : null}
-          </p>
+    <div className="flex flex-col gap-6 p-4">
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border pb-5">
+        <div className="flex items-center gap-4">
+          <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+            <MessageSquareQuoteIcon className="size-5" aria-hidden="true" />
+          </div>
+          <div>
+            <h2 className="font-heading text-lg font-semibold tracking-tight text-foreground">Testimonials</h2>
+            <p className="mt-0.5 flex items-center gap-1.5 text-sm text-muted-foreground">
+              <span>
+                {testimonials.length} {testimonials.length === 1 ? "testimonial" : "testimonials"}
+              </span>
+              {averageRating ? (
+                <span className="flex items-center gap-1 font-medium text-foreground">
+                  <span aria-hidden="true">·</span>
+                  <StarIcon className="size-3.5 fill-primary text-primary" aria-hidden="true" />
+                  {averageRating.toFixed(1)}
+                </span>
+              ) : null}
+              {isSelf ? <span>· {MAX_TESTIMONIALS - testimonials.length} remaining</span> : null}
+            </p>
+          </div>
         </div>
         {isSelf ? (
           <Button
@@ -255,7 +275,7 @@ export function TestimonialGrid({
         ) : null}
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
         {testimonials.map((testimonial, index) =>
           isSelf ? (
             <OwnerTestimonialTile
