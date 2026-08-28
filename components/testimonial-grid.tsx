@@ -10,13 +10,16 @@ import {
   MoreHorizontalIcon,
   PencilIcon,
   PlusIcon,
+  RadioTowerIcon,
   StarIcon,
   Trash2Icon,
 } from "lucide-react"
 import { deleteTestimonial, moveTestimonial } from "@/app/actions/testimonials"
 import type { Testimonial } from "@/lib/testimonials"
+import { stripHtmlToText } from "@/lib/sanitize-html"
 import { TestimonialCard } from "@/components/testimonial-card"
 import { TestimonialDialog } from "@/components/testimonial-editor"
+import { PublishToFeedDialog } from "@/components/publish-to-feed-dialog"
 import { Button } from "@/components/ui/button"
 import {
   Empty,
@@ -64,6 +67,7 @@ function OwnerTestimonialTile({
 }) {
   const [editOpen, setEditOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
+  const [publishOpen, setPublishOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
 
   function handleMove(direction: "up" | "down") {
@@ -120,6 +124,10 @@ function OwnerTestimonialTile({
               Move down
             </DropdownMenuItem>
             <DropdownMenuSeparator />
+            <DropdownMenuItem disabled={isPending} onClick={() => setPublishOpen(true)}>
+              <RadioTowerIcon data-icon="inline-start" />
+              Publish to feed
+            </DropdownMenuItem>
             <DropdownMenuItem disabled={isPending} onClick={() => setEditOpen(true)}>
               <PencilIcon data-icon="inline-start" />
               Edit testimonial
@@ -139,6 +147,19 @@ function OwnerTestimonialTile({
         onSaved={onChanged}
         serviceOptions={serviceOptions}
         projectOptions={projectOptions}
+      />
+
+      <PublishToFeedDialog
+        open={publishOpen}
+        onOpenChange={setPublishOpen}
+        item={{
+          type: "testimonial",
+          id: testimonial.id,
+          title: testimonial.authorName,
+          subtitle: testimonial.projectTitle ?? stripHtmlToText(testimonial.content).slice(0, 140),
+          image: testimonial.authorAvatar,
+          imageType: "image",
+        }}
       />
 
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>

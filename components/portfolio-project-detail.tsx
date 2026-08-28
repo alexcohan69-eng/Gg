@@ -11,6 +11,7 @@ import {
   MoreHorizontalIcon,
   PencilIcon,
   PlayIcon,
+  RadioTowerIcon,
   Trash2Icon,
 } from "lucide-react"
 import { deletePortfolioProject } from "@/app/actions/portfolio"
@@ -18,6 +19,7 @@ import { sanitizePostHtml } from "@/lib/sanitize-html"
 import type { PortfolioProject } from "@/lib/portfolio"
 import type { Testimonial } from "@/lib/testimonials"
 import { PortfolioProjectDialog } from "@/components/portfolio-project-editor"
+import { PublishToFeedDialog } from "@/components/publish-to-feed-dialog"
 import { ClientReviewsSection } from "@/components/client-reviews-section"
 import { MediaLightbox } from "@/components/media-lightbox"
 import { Badge } from "@/components/ui/badge"
@@ -55,6 +57,7 @@ export function PortfolioProjectDetail({
   const router = useRouter()
   const [editOpen, setEditOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
+  const [publishOpen, setPublishOpen] = useState(false)
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
   const [isPending, startTransition] = useTransition()
 
@@ -164,6 +167,10 @@ export function PortfolioProjectDetail({
                 }
               />
               <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setPublishOpen(true)}>
+                  <RadioTowerIcon data-icon="inline-start" />
+                  Publish to feed
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setEditOpen(true)}>
                   <PencilIcon data-icon="inline-start" />
                   Edit project
@@ -294,6 +301,19 @@ export function PortfolioProjectDetail({
             onOpenChange={setEditOpen}
             project={project}
             onSaved={handleChanged}
+          />
+
+          <PublishToFeedDialog
+            open={publishOpen}
+            onOpenChange={setPublishOpen}
+            item={{
+              type: "project",
+              id: project.id,
+              title: project.title,
+              subtitle: project.tagline,
+              image: project.coverImage,
+              imageType: project.coverImageType,
+            }}
           />
 
           <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>

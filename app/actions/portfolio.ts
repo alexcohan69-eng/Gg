@@ -6,7 +6,7 @@ import { del } from "@vercel/blob"
 import { and, eq } from "drizzle-orm"
 import { getSessionWithRetry } from "@/lib/auth"
 import { db } from "@/lib/db"
-import { portfolioProjects, testimonials } from "@/lib/db/schema"
+import { portfolioProjects, posts, testimonials } from "@/lib/db/schema"
 import {
   mediaUrlToPathname,
   validateGalleryMedia,
@@ -34,6 +34,9 @@ function revalidatePortfolio() {
   // segments covers every viewer of them.
   revalidatePath("/profile/[username]/work", "page")
   revalidatePath("/profile/[username]/work/[projectId]", "page")
+  // A project can also be showcased via a "publish to feed" post, so
+  // an edit/delete needs to bust the home feed's cached preview cards too.
+  revalidatePath("/home")
 }
 
 const MAX_TITLE = 80
@@ -291,6 +294,14 @@ export async function deletePortfolioProject(id: string): Promise<ActionResult> 
     .update(testimonials)
     .set({ projectId: null })
     .where(and(eq(testimonials.projectId, id), eq(testimonials.userId, userId)))
+
+  // Same for any "publish to feed" post that showcased this project —
+  // the post itself stays up, it just stops rendering the (now
+  // deleted) preview card.
+  await db
+    .update(posts)
+    .set({ attachedProjectId: null })
+    .where(and(eq(posts.attachedProjectId, id), eq(posts.userId, userId)))
 
   // Best-effort cleanup of the project's uploaded images. A failure
   // here shouldn't fail the delete — the row is already gone.

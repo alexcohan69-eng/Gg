@@ -6,7 +6,7 @@ import { del } from "@vercel/blob"
 import { and, eq } from "drizzle-orm"
 import { getSessionWithRetry } from "@/lib/auth"
 import { db } from "@/lib/db"
-import { services, portfolioProjects, testimonials } from "@/lib/db/schema"
+import { services, portfolioProjects, posts, testimonials } from "@/lib/db/schema"
 import {
   mediaUrlToPathname,
   validateGalleryMedia,
@@ -36,6 +36,10 @@ function revalidateTestimonials() {
   // needs to bust those too, not just the Testimonials tab itself.
   revalidatePath("/profile/[username]/services/[serviceId]", "page")
   revalidatePath("/profile/[username]/work/[projectId]", "page")
+  // A testimonial can also be showcased via a "publish to feed" post,
+  // so an edit/delete needs to bust the home feed's cached preview
+  // cards too.
+  revalidatePath("/home")
 }
 
 const MAX_AUTHOR_NAME = 60
@@ -296,6 +300,14 @@ export async function deleteTestimonial(id: string): Promise<ActionResult> {
     .limit(1)
 
   await db.delete(testimonials).where(and(eq(testimonials.id, id), eq(testimonials.userId, userId)))
+
+  // Same for any "publish to feed" post that showcased this
+  // testimonial — the post itself stays up, it just stops rendering
+  // the (now deleted) preview card.
+  await db
+    .update(posts)
+    .set({ attachedTestimonialId: null })
+    .where(and(eq(posts.attachedTestimonialId, id), eq(posts.userId, userId)))
 
   // Best-effort cleanup of the testimonial's uploaded avatar + proof
   // media. A failure here shouldn't fail the delete — the row is

@@ -1,8 +1,37 @@
 import { cache } from "react"
 import { and, asc, count, desc, eq, gt, inArray, notInArray, sql } from "drizzle-orm"
 import { db } from "@/lib/db"
-import { bookmarks, follows, likes, posts, reposts, user } from "@/lib/db/schema"
-import { parseMediaColumn, type MediaAttachment } from "@/lib/media"
+import {
+  bookmarks,
+  follows,
+  likes,
+  portfolioProjects,
+  posts,
+  reposts,
+  services,
+  testimonials,
+  user,
+} from "@/lib/db/schema"
+import { parseMediaColumn, type MediaAttachment, type MediaType } from "@/lib/media"
+import { stripHtmlToText } from "@/lib/sanitize-html"
+
+/**
+ * Compact preview of a service/portfolio project/testimonial that a
+ * post links to via `posts.attachedServiceId`/`attachedProjectId`/
+ * `attachedTestimonialId` — at most one of the three is ever set (see
+ * lib/db/schema.ts). Lets `PostCard` render a rich preview card the
+ * same way a link-unfurl would, without the client needing to know
+ * anything about the linked table's shape.
+ */
+export type AttachedItemPreview = {
+  type: "service" | "project" | "testimonial"
+  id: string
+  title: string
+  subtitle: string | null
+  image: string | null
+  imageType: MediaType | null
+  meta: string | null
+}
 
 /**
  * `notInArray` with an empty list isn't a no-op filter in SQL (it can
@@ -38,24 +67,145 @@ export type FeedPost = {
   isBookmarked: boolean
   isReposted: boolean
   replyToId: string | null
+  /** The linked service/project/testimonial preview, if any — see `AttachedItemPreview`. */
+  attachment: AttachedItemPreview | null
 }
 
-/** Raw feed post row shape as it comes back from the query, before media parsing. */
-type RawFeedPostRow = Omit<FeedPost, "media"> & { media: string | null }
+/** Raw feed post row shape as it comes back from the query, before media parsing and attachment resolution. */
+type RawFeedPostRow = Omit<FeedPost, "media" | "attachment"> & {
+  media: string | null
+  attachedServiceId: string | null
+  attachedProjectId: string | null
+  attachedTestimonialId: string | null
+}
+
+/**
+ * Batch-loads the `AttachedItemPreview` for every distinct
+ * service/project/testimonial referenced across a page of rows, keyed
+ * by `"<type>:<id>"`. One round trip per linked table regardless of how
+ * many posts reference it, instead of a per-post lookup.
+ */
+async function loadAttachmentPreviews(
+  rows: Pick<RawFeedPostRow, "attachedServiceId" | "attachedProjectId" | "attachedTestimonialId">[],
+): Promise<Map<string, AttachedItemPreview>> {
+  const serviceIds = [...new Set(rows.map((r) => r.attachedServiceId).filter((id): id is string => id !== null))]
+  const projectIds = [...new Set(rows.map((r) => r.attachedProjectId).filter((id): id is string => id !== null))]
+  const testimonialIds = [
+    ...new Set(rows.map((r) => r.attachedTestimonialId).filter((id): id is string => id !== null)),
+  ]
+
+  const previews = new Map<string, AttachedItemPreview>()
+  if (serviceIds.length === 0 && projectIds.length === 0 && testimonialIds.length === 0) {
+    return previews
+  }
+
+  const [serviceRows, projectRows, testimonialRows] = await Promise.all([
+    serviceIds.length > 0
+      ? db
+          .select({
+            id: services.id,
+            title: services.title,
+            tagline: services.tagline,
+            coverImage: services.coverImage,
+            coverImageType: services.coverImageType,
+            startingPrice: services.startingPrice,
+            deliveryDays: services.deliveryDays,
+          })
+          .from(services)
+          .where(inArray(services.id, serviceIds))
+      : Promise.resolve([]),
+    projectIds.length > 0
+      ? db
+          .select({
+            id: portfolioProjects.id,
+            title: portfolioProjects.title,
+            tagline: portfolioProjects.tagline,
+            coverImage: portfolioProjects.coverImage,
+            coverImageType: portfolioProjects.coverImageType,
+            client: portfolioProjects.client,
+          })
+          .from(portfolioProjects)
+          .where(inArray(portfolioProjects.id, projectIds))
+      : Promise.resolve([]),
+    testimonialIds.length > 0
+      ? db
+          .select({
+            id: testimonials.id,
+            authorName: testimonials.authorName,
+            authorAvatar: testimonials.authorAvatar,
+            rating: testimonials.rating,
+            content: testimonials.content,
+            projectTitle: testimonials.projectTitle,
+          })
+          .from(testimonials)
+          .where(inArray(testimonials.id, testimonialIds))
+      : Promise.resolve([]),
+  ])
+
+  for (const row of serviceRows) {
+    previews.set(`service:${row.id}`, {
+      type: "service",
+      id: row.id,
+      title: row.title,
+      subtitle: row.tagline,
+      image: row.coverImage,
+      imageType: (row.coverImageType as MediaType | null) ?? "image",
+      meta: `From $${row.startingPrice.toLocaleString()} · ${row.deliveryDays} ${row.deliveryDays === 1 ? "day" : "days"}`,
+    })
+  }
+  for (const row of projectRows) {
+    previews.set(`project:${row.id}`, {
+      type: "project",
+      id: row.id,
+      title: row.title,
+      subtitle: row.tagline,
+      image: row.coverImage,
+      imageType: (row.coverImageType as MediaType | null) ?? "image",
+      meta: row.client ? `Client: ${row.client}` : null,
+    })
+  }
+  for (const row of testimonialRows) {
+    previews.set(`testimonial:${row.id}`, {
+      type: "testimonial",
+      id: row.id,
+      title: row.authorName,
+      subtitle: row.projectTitle ?? stripHtmlToText(row.content).slice(0, 140),
+      image: row.authorAvatar,
+      imageType: "image",
+      meta: row.rating ? `${row.rating} out of 5 stars` : null,
+    })
+  }
+
+  return previews
+}
 
 /**
  * `posts.media` comes back from the query as the raw JSON-encoded TEXT
- * column (Aurora DSQL has no JSON/JSONB type) — every feed query below
+ * column (Aurora DSQL has no JSON/JSONB type), and the attached-item
+ * columns are plain foreign-id text columns — every feed query below
  * runs its rows through this before returning so callers only ever see
- * the parsed `MediaAttachment[] | null` shape.
+ * the parsed `MediaAttachment[] | null` media shape plus a resolved
+ * `attachment` preview.
  */
-function parseFeedPostRow(row: RawFeedPostRow): FeedPost {
-  const media = parseMediaColumn(row.media)
-  return { ...row, media: media.length > 0 ? media : null }
-}
+export async function finalizeFeedPosts(rows: RawFeedPostRow[]): Promise<FeedPost[]> {
+  const previews = await loadAttachmentPreviews(rows)
 
-function parseFeedPostRows(rows: RawFeedPostRow[]): FeedPost[] {
-  return rows.map(parseFeedPostRow)
+  return rows.map((row) => {
+    const { attachedServiceId, attachedProjectId, attachedTestimonialId, media, ...rest } = row
+    const key = attachedServiceId
+      ? `service:${attachedServiceId}`
+      : attachedProjectId
+        ? `project:${attachedProjectId}`
+        : attachedTestimonialId
+          ? `testimonial:${attachedTestimonialId}`
+          : null
+    const parsedMedia = parseMediaColumn(media)
+    return {
+      ...rest,
+      media: parsedMedia.length > 0 ? parsedMedia : null,
+      attachment: key ? previews.get(key) ?? null : null,
+    }
+  })
 }
 
 const FEED_PAGE_SIZE = 30
@@ -69,6 +219,9 @@ export const feedBaseSelection = {
   replyCount: posts.replyCount,
   repostCount: posts.repostCount,
   replyToId: posts.replyToId,
+  attachedServiceId: posts.attachedServiceId,
+  attachedProjectId: posts.attachedProjectId,
+  attachedTestimonialId: posts.attachedTestimonialId,
   authorId: posts.userId,
   authorName: user.name,
   authorUsername: user.username,
@@ -122,7 +275,7 @@ export async function getFeedPosts(
     .orderBy(desc(posts.createdAt))
     .limit(limit)
 
-  return parseFeedPostRows(rows)
+  return finalizeFeedPosts(rows)
 }
 
 /**
@@ -169,7 +322,7 @@ export async function getFollowingFeed(
     .orderBy(desc(posts.createdAt))
     .limit(limit)
 
-  return parseFeedPostRows(rows)
+  return finalizeFeedPosts(rows)
 }
 
 /**
@@ -249,7 +402,7 @@ export async function getUserPosts(
     .orderBy(desc(posts.createdAt))
     .limit(limit)
 
-  return parseFeedPostRows(rows)
+  return finalizeFeedPosts(rows)
 }
 
 /**
@@ -279,7 +432,7 @@ export async function getBookmarkedPosts(
     .orderBy(desc(bookmarks.createdAt))
     .limit(limit)
 
-  return parseFeedPostRows(rows)
+  return finalizeFeedPosts(rows)
 }
 
 /**
@@ -314,7 +467,9 @@ export const getPostById = cache(async function getPostById(
     .where(eq(posts.id, postId))
     .limit(1)
 
-  return rows[0] ? parseFeedPostRow(rows[0]) : null
+  if (!rows[0]) return null
+  const [post] = await finalizeFeedPosts(rows)
+  return post ?? null
 })
 
 /**
@@ -348,5 +503,5 @@ export async function getPostReplies(
     .orderBy(asc(posts.createdAt))
     .limit(limit)
 
-  return parseFeedPostRows(rows)
+  return finalizeFeedPosts(rows)
 }
