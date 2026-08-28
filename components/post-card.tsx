@@ -32,6 +32,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { ReportDialog } from "@/components/report-dialog"
+import { AttachedItemCard } from "@/components/attached-item-card"
 import { cn, getInitials, formatRelativeTime, profileHref } from "@/lib/utils"
 import { sanitizePostHtml } from "@/lib/sanitize-html"
 import type { FeedPost } from "@/lib/posts"
@@ -240,6 +241,15 @@ export function PostCard({
             />
           ) : null}
         </ClickWrapper>
+
+        {post.attached ? (
+          <div className="mt-2">
+            <AttachedItemCard
+              attached={post.attached}
+              profileIdentifier={post.authorUsername ?? post.authorId}
+            />
+          </div>
+        ) : null}
 
         {post.media && post.media.length > 0 ? (
           post.media[0].type === "video" ? (

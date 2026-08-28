@@ -1,8 +1,19 @@
 import { cache } from "react"
 import { and, asc, count, desc, eq, gt, inArray, notInArray, sql } from "drizzle-orm"
 import { db } from "@/lib/db"
-import { bookmarks, follows, likes, posts, reposts, user } from "@/lib/db/schema"
-import { parseMediaColumn, type MediaAttachment } from "@/lib/media"
+import {
+  bookmarks,
+  follows,
+  likes,
+  portfolioProjects,
+  posts,
+  reposts,
+  services,
+  testimonials,
+  user,
+} from "@/lib/db/schema"
+import { parseMediaColumn, type MediaAttachment, type MediaType } from "@/lib/media"
+import { stripHtmlToText } from "@/lib/sanitize-html"
 
 /**
  * `notInArray` with an empty list isn't a no-op filter in SQL (it can
@@ -14,6 +25,41 @@ function excludeAuthorsCondition(excludeUserIds: Set<string>) {
     ? notInArray(posts.userId, [...excludeUserIds])
     : undefined
 }
+
+/**
+ * A post can embed a compact preview card linking back to one of the
+ * author's own services/portfolioProjects/testimonials rows (see the
+ * `attached*Id` columns on `posts`). At most one of the three ids is
+ * ever set, so this is a discriminated union rather than three
+ * separate optional fields.
+ */
+export type AttachedItem =
+  | {
+      kind: "service"
+      id: string
+      title: string
+      tagline: string
+      coverImage: string | null
+      coverImageType: MediaType
+      startingPrice: number
+      deliveryDays: number
+    }
+  | {
+      kind: "project"
+      id: string
+      title: string
+      tagline: string
+      coverImage: string | null
+      coverImageType: MediaType
+    }
+  | {
+      kind: "testimonial"
+      id: string
+      authorName: string
+      authorAvatar: string | null
+      rating: number | null
+      content: string
+    }
 
 /**
  * A post joined with its author's public profile fields plus the
@@ -38,10 +84,86 @@ export type FeedPost = {
   isBookmarked: boolean
   isReposted: boolean
   replyToId: string | null
+  attached: AttachedItem | null
+}
+
+/**
+ * Raw shape of the three possibly-joined attachment tables, as they
+ * come back nested in the query result — every leaf is null when that
+ * table's left join didn't match (i.e. the post doesn't attach that
+ * kind, or its target row was deleted).
+ */
+type RawAttachmentJoins = {
+  attachedService: {
+    id: string | null
+    title: string | null
+    tagline: string | null
+    coverImage: string | null
+    coverImageType: string | null
+    startingPrice: number | null
+    deliveryDays: number | null
+  }
+  attachedProject: {
+    id: string | null
+    title: string | null
+    tagline: string | null
+    coverImage: string | null
+    coverImageType: string | null
+  }
+  attachedTestimonial: {
+    id: string | null
+    authorName: string | null
+    authorAvatar: string | null
+    rating: number | null
+    content: string | null
+  }
 }
 
 /** Raw feed post row shape as it comes back from the query, before media parsing. */
-type RawFeedPostRow = Omit<FeedPost, "media"> & { media: string | null }
+type RawFeedPostRow = Omit<FeedPost, "media" | "attached"> &
+  RawAttachmentJoins & { media: string | null }
+
+/**
+ * Assembles the `attached` union from the three left-joined tables —
+ * at most one of them ever has a non-null `id`, since at most one of
+ * `attachedServiceId`/`attachedProjectId`/`attachedTestimonialId` is
+ * ever set on the post row itself.
+ */
+function buildAttachedItem(row: RawAttachmentJoins): AttachedItem | null {
+  if (row.attachedService.id) {
+    return {
+      kind: "service",
+      id: row.attachedService.id,
+      title: row.attachedService.title ?? "",
+      tagline: row.attachedService.tagline ?? "",
+      coverImage: row.attachedService.coverImage,
+      coverImageType: (row.attachedService.coverImageType as MediaType | null) ?? "image",
+      startingPrice: row.attachedService.startingPrice ?? 0,
+      deliveryDays: row.attachedService.deliveryDays ?? 0,
+    }
+  }
+  if (row.attachedProject.id) {
+    return {
+      kind: "project",
+      id: row.attachedProject.id,
+      title: row.attachedProject.title ?? "",
+      tagline: row.attachedProject.tagline ?? "",
+      coverImage: row.attachedProject.coverImage,
+      coverImageType: (row.attachedProject.coverImageType as MediaType | null) ?? "image",
+    }
+  }
+  if (row.attachedTestimonial.id) {
+    return {
+      kind: "testimonial",
+      id: row.attachedTestimonial.id,
+      authorName: row.attachedTestimonial.authorName ?? "",
+      authorAvatar: row.attachedTestimonial.authorAvatar,
+      rating: row.attachedTestimonial.rating,
+      content: stripHtmlToText(row.attachedTestimonial.content ?? ""),
+    }
+  }
+  return null
+}
 
 /**
  * `posts.media` comes back from the query as the raw JSON-encoded TEXT
@@ -51,7 +173,7 @@ type RawFeedPostRow = Omit<FeedPost, "media"> & { media: string | null }
  */
 function parseFeedPostRow(row: RawFeedPostRow): FeedPost {
   const media = parseMediaColumn(row.media)
-  return { ...row, media: media.length > 0 ? media : null }
+  return { ...row, media: media.length > 0 ? media : null, attached: buildAttachedItem(row) }
 }
 
 function parseFeedPostRows(rows: RawFeedPostRow[]): FeedPost[] {
@@ -59,6 +181,38 @@ function parseFeedPostRows(rows: RawFeedPostRow[]): FeedPost[] {
 }
 
 const FEED_PAGE_SIZE = 30
+
+/**
+ * Nested selection for the three possibly-attached tables — Drizzle
+ * groups these under their own key in the result row (matching
+ * `RawAttachmentJoins`), which is what makes `buildAttachedItem` able
+ * to read them back out as one coherent object per kind.
+ */
+const attachedSelection = {
+  attachedService: {
+    id: services.id,
+    title: services.title,
+    tagline: services.tagline,
+    coverImage: services.coverImage,
+    coverImageType: services.coverImageType,
+    startingPrice: services.startingPrice,
+    deliveryDays: services.deliveryDays,
+  },
+  attachedProject: {
+    id: portfolioProjects.id,
+    title: portfolioProjects.title,
+    tagline: portfolioProjects.tagline,
+    coverImage: portfolioProjects.coverImage,
+    coverImageType: portfolioProjects.coverImageType,
+  },
+  attachedTestimonial: {
+    id: testimonials.id,
+    authorName: testimonials.authorName,
+    authorAvatar: testimonials.authorAvatar,
+    rating: testimonials.rating,
+    content: testimonials.content,
+  },
+} as const
 
 export const feedBaseSelection = {
   id: posts.id,
@@ -73,6 +227,7 @@ export const feedBaseSelection = {
   authorName: user.name,
   authorUsername: user.username,
   authorImage: user.image,
+  ...attachedSelection,
 } as const
 
 /**
@@ -91,6 +246,20 @@ export function withLikeAndRepostJoins(query: any, viewerId: string) {
       reposts,
       and(eq(reposts.postId, posts.id), eq(reposts.userId, viewerId)),
     )
+}
+
+/**
+ * Left-joins the (at most one) service/project/testimonial a post
+ * attaches, so `feedBaseSelection`'s nested `attachedService`/
+ * `attachedProject`/`attachedTestimonial` fields can be read back into
+ * one `AttachedItem` by `buildAttachedItem`. A deleted target row just
+ * leaves every leaf null, same as a post with no attachment at all.
+ */
+export function withAttachmentJoins(query: any) {
+  return query
+    .leftJoin(services, eq(posts.attachedServiceId, services.id))
+    .leftJoin(portfolioProjects, eq(posts.attachedProjectId, portfolioProjects.id))
+    .leftJoin(testimonials, eq(posts.attachedTestimonialId, testimonials.id))
 }
 
 /**
@@ -117,7 +286,7 @@ export async function getFeedPosts(
       and(eq(bookmarks.postId, posts.id), eq(bookmarks.userId, viewerId)),
     )
 
-  const rows = await withLikeAndRepostJoins(query, viewerId)
+  const rows = await withAttachmentJoins(withLikeAndRepostJoins(query, viewerId))
     .where(and(eq(posts.isReply, false), excludeAuthorsCondition(excludeUserIds)))
     .orderBy(desc(posts.createdAt))
     .limit(limit)
@@ -158,7 +327,7 @@ export async function getFollowingFeed(
       and(eq(bookmarks.postId, posts.id), eq(bookmarks.userId, viewerId)),
     )
 
-  const rows = await withLikeAndRepostJoins(query, viewerId)
+  const rows = await withAttachmentJoins(withLikeAndRepostJoins(query, viewerId))
     .where(
       and(
         eq(posts.isReply, false),
@@ -244,7 +413,7 @@ export async function getUserPosts(
       and(eq(bookmarks.postId, posts.id), eq(bookmarks.userId, viewerId)),
     )
 
-  const rows = await withLikeAndRepostJoins(query, viewerId)
+  const rows = await withAttachmentJoins(withLikeAndRepostJoins(query, viewerId))
     .where(and(eq(posts.userId, userId), eq(posts.isReply, false)))
     .orderBy(desc(posts.createdAt))
     .limit(limit)
@@ -274,7 +443,7 @@ export async function getBookmarkedPosts(
     .innerJoin(posts, eq(bookmarks.postId, posts.id))
     .innerJoin(user, eq(posts.userId, user.id))
 
-  const rows = await withLikeAndRepostJoins(query, viewerId)
+  const rows = await withAttachmentJoins(withLikeAndRepostJoins(query, viewerId))
     .where(and(eq(bookmarks.userId, viewerId), excludeAuthorsCondition(excludeUserIds)))
     .orderBy(desc(bookmarks.createdAt))
     .limit(limit)
@@ -310,7 +479,7 @@ export const getPostById = cache(async function getPostById(
       and(eq(bookmarks.postId, posts.id), eq(bookmarks.userId, viewerId)),
     )
 
-  const rows = await withLikeAndRepostJoins(query, viewerId)
+  const rows = await withAttachmentJoins(withLikeAndRepostJoins(query, viewerId))
     .where(eq(posts.id, postId))
     .limit(1)
 
@@ -343,7 +512,7 @@ export async function getPostReplies(
       and(eq(bookmarks.postId, posts.id), eq(bookmarks.userId, viewerId)),
     )
 
-  const rows = await withLikeAndRepostJoins(query, viewerId)
+  const rows = await withAttachmentJoins(withLikeAndRepostJoins(query, viewerId))
     .where(and(eq(posts.replyToId, postId), excludeAuthorsCondition(excludeUserIds)))
     .orderBy(asc(posts.createdAt))
     .limit(limit)

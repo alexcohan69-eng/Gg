@@ -11,7 +11,7 @@ import {
 import { useRouter } from "next/navigation"
 import Image from "next/image"
 import { upload } from "@vercel/blob/client"
-import { ImageIcon, TypeIcon, VideoIcon, XIcon } from "lucide-react"
+import { BriefcaseIcon, ImageIcon, QuoteIcon, TypeIcon, VideoIcon, XIcon } from "lucide-react"
 import { toast } from "sonner"
 import { createPost } from "@/app/actions/posts"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -153,13 +153,23 @@ function useMediaAttachments() {
   }
 }
 
+export type ComposerAttachedItem = {
+  kind: "service" | "project" | "testimonial"
+  id: string
+  /** Rendered in the composer's static preview — title for services/projects, quote/author for testimonials. */
+  label: string
+  sublabel?: string
+}
+
 export function PostComposer({
   user,
   replyToId,
   replyToUsername,
+  attachedItem,
   placeholder = "What's happening?",
   submitLabel = "Post",
   autoFocus = false,
+  className,
   onPosted,
 }: {
   user: { name: string; image?: string | null }
@@ -167,9 +177,19 @@ export function PostComposer({
   replyToId?: string
   /** Author of the post being replied to, shown as a "Replying to @…" context line. */
   replyToUsername?: string | null
+  /**
+   * When set, the created post embeds a preview card linking to this
+   * service/project/testimonial (see attachedKind/attachedId in
+   * createPost). Media attach buttons are hidden — the composer is
+   * caption-only in this mode — and an empty caption is allowed since
+   * the attachment itself is the content.
+   */
+  attachedItem?: ComposerAttachedItem
   placeholder?: string
   submitLabel?: string
   autoFocus?: boolean
+  /** Overrides the outer form's default feed-row styling (e.g. inside a dialog). */
+  className?: string
   /** Called after a successful post, e.g. to refocus or scroll a list. */
   onPosted?: () => void
 }) {
@@ -213,7 +233,7 @@ export function PostComposer({
     }
   }, [editor])
 
-  const canSubmit = editor && (!isEmpty || attachments.length > 0)
+  const canSubmit = editor && (!isEmpty || attachments.length > 0 || Boolean(attachedItem))
   const canAddMoreImages = !hasVideo && attachments.length < MAX_MEDIA_PER_POST
   const canAddVideo = !hasVideo && !hasImageOrGif
   // The composer only needs its full surface (attachments grid, toolbar,
@@ -221,8 +241,10 @@ export function PostComposer({
   // to a slim, low-noise row so it doesn't compete with the feed below it.
   // `showFormatting` is included so opening the formatting row can't blur
   // the (still-empty) editor and collapse the whole composer out from
-  // under it.
-  const isExpanded = isFocused || !isEmpty || attachments.length > 0 || showFormatting
+  // under it. An attached item always shows the full surface — the
+  // ShareToFeedDialog wrapping it has no other content to collapse to.
+  const isExpanded =
+    isFocused || !isEmpty || attachments.length > 0 || showFormatting || Boolean(attachedItem)
 
   function handleImagesSelected(e: ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? [])
@@ -256,6 +278,10 @@ export function PostComposer({
     if (replyToId) {
       formData.set("replyToId", replyToId)
     }
+    if (attachedItem) {
+      formData.set("attachedKind", attachedItem.kind)
+      formData.set("attachedId", attachedItem.id)
+    }
     formData.set("media", JSON.stringify(uploadedMedia))
 
     startTransition(async () => {
@@ -286,7 +312,7 @@ export function PostComposer({
       }}
       onDragLeave={() => setIsDraggingOver(false)}
       onDrop={handleDrop}
-      className="border-b border-border p-3 sm:p-4"
+      className={cn("border-b border-border p-3 sm:p-4", className)}
     >
       {/* Single elevated surface so the composer reads as one focused
           object rather than a loose stack of controls. Idle and empty, it
@@ -349,6 +375,26 @@ export function PostComposer({
             )}
           />
         </div>
+
+        {isExpanded && attachedItem ? (
+          <div className="flex items-center gap-2.5 rounded-xl border border-border bg-card/50 p-2.5">
+            <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              {attachedItem.kind === "testimonial" ? (
+                <QuoteIcon className="size-4" aria-hidden="true" />
+              ) : attachedItem.kind === "service" ? (
+                <BriefcaseIcon className="size-4" aria-hidden="true" />
+              ) : (
+                <ImageIcon className="size-4" aria-hidden="true" />
+              )}
+            </div>
+            <div className="min-w-0">
+              <p className="line-clamp-1 text-sm font-medium text-foreground">{attachedItem.label}</p>
+              {attachedItem.sublabel ? (
+                <p className="line-clamp-1 text-xs text-muted-foreground">{attachedItem.sublabel}</p>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
 
         {isExpanded && attachments.length > 0 ? (
           <ul
@@ -422,50 +468,54 @@ export function PostComposer({
         {isExpanded ? (
           <div className="flex items-center justify-between gap-2 border-t border-border/60 px-1 pt-2">
             <div className="flex min-w-0 items-center gap-0.5">
-              <input
-                ref={imageInputRef}
-                type="file"
-                accept="image/jpeg,image/png,image/webp,image/gif"
-                multiple
-                onChange={handleImagesSelected}
-                className="sr-only"
-                aria-hidden="true"
-                tabIndex={-1}
-              />
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                className="rounded-full text-primary hover:bg-primary/10"
-                aria-label="Add image or GIF"
-                onClick={() => imageInputRef.current?.click()}
-                disabled={isPending || !canAddMoreImages}
-              >
-                <ImageIcon />
-              </Button>
+              {!attachedItem ? (
+                <>
+                  <input
+                    ref={imageInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    multiple
+                    onChange={handleImagesSelected}
+                    className="sr-only"
+                    aria-hidden="true"
+                    tabIndex={-1}
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    className="rounded-full text-primary hover:bg-primary/10"
+                    aria-label="Add image or GIF"
+                    onClick={() => imageInputRef.current?.click()}
+                    disabled={isPending || !canAddMoreImages}
+                  >
+                    <ImageIcon />
+                  </Button>
 
-              <input
-                ref={videoInputRef}
-                type="file"
-                accept="video/mp4,video/webm,video/quicktime"
-                onChange={handleVideoSelected}
-                className="sr-only"
-                aria-hidden="true"
-                tabIndex={-1}
-              />
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                className="rounded-full text-primary hover:bg-primary/10"
-                aria-label="Add video"
-                onClick={() => videoInputRef.current?.click()}
-                disabled={isPending || !canAddVideo}
-              >
-                <VideoIcon />
-              </Button>
+                  <input
+                    ref={videoInputRef}
+                    type="file"
+                    accept="video/mp4,video/webm,video/quicktime"
+                    onChange={handleVideoSelected}
+                    className="sr-only"
+                    aria-hidden="true"
+                    tabIndex={-1}
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    className="rounded-full text-primary hover:bg-primary/10"
+                    aria-label="Add video"
+                    onClick={() => videoInputRef.current?.click()}
+                    disabled={isPending || !canAddVideo}
+                  >
+                    <VideoIcon />
+                  </Button>
 
-              <span className="mx-1 h-5 w-px bg-border" aria-hidden="true" />
+                  <span className="mx-1 h-5 w-px bg-border" aria-hidden="true" />
+                </>
+              ) : null}
 
               <Button
                 type="button"

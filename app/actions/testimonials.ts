@@ -6,7 +6,7 @@ import { del } from "@vercel/blob"
 import { and, eq } from "drizzle-orm"
 import { getSessionWithRetry } from "@/lib/auth"
 import { db } from "@/lib/db"
-import { services, portfolioProjects, testimonials } from "@/lib/db/schema"
+import { posts, services, portfolioProjects, testimonials } from "@/lib/db/schema"
 import {
   mediaUrlToPathname,
   validateGalleryMedia,
@@ -297,6 +297,14 @@ export async function deleteTestimonial(id: string): Promise<ActionResult> {
 
   await db.delete(testimonials).where(and(eq(testimonials.id, id), eq(testimonials.userId, userId)))
 
+  // No FK constraint (Aurora DSQL has none), so any post that shared
+  // this testimonial to the feed would otherwise keep pointing at a
+  // deleted id — clear the attachment instead of leaving it dangling.
+  await db
+    .update(posts)
+    .set({ attachedTestimonialId: null })
+    .where(and(eq(posts.attachedTestimonialId, id), eq(posts.userId, userId)))
+
   // Best-effort cleanup of the testimonial's uploaded avatar + proof
   // media. A failure here shouldn't fail the delete — the row is
   // already gone.
@@ -322,6 +330,7 @@ export async function deleteTestimonial(id: string): Promise<ActionResult> {
   }
 
   revalidateTestimonials()
+  revalidatePath("/home")
 
   return { success: true }
 }

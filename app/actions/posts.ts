@@ -6,7 +6,7 @@ import { del } from "@vercel/blob"
 import { and, eq, sql } from "drizzle-orm"
 import { getSessionWithRetry } from "@/lib/auth"
 import { db } from "@/lib/db"
-import { posts } from "@/lib/db/schema"
+import { portfolioProjects, posts, services, testimonials } from "@/lib/db/schema"
 import { createNotification } from "@/lib/notifications"
 import { isBlockedEitherWay } from "@/lib/blocks"
 import { logActionError } from "@/lib/log-action-error"
@@ -82,6 +82,68 @@ export type PostActionResult = {
   error?: string
 }
 
+type AttachedIds = {
+  attachedServiceId: string | null
+  attachedProjectId: string | null
+  attachedTestimonialId: string | null
+}
+
+/**
+ * Reads the composer's optional "attachedKind"/"attachedId" fields and
+ * resolves them against the corresponding table, scoped to the
+ * posting user — a post can only embed a preview of a service/
+ * project/testimonial the author actually owns, never someone else's
+ * (or a stale/deleted id). Returns an error rather than silently
+ * dropping the link, since — unlike the testimonial editor's optional
+ * link picker — attaching *is* the point of this submission.
+ */
+async function resolveAttachedItem(
+  userId: string,
+  formData: FormData,
+): Promise<AttachedIds | { error: string }> {
+  const kind = String(formData.get("attachedKind") ?? "")
+  const id = String(formData.get("attachedId") ?? "").trim()
+  const empty: AttachedIds = {
+    attachedServiceId: null,
+    attachedProjectId: null,
+    attachedTestimonialId: null,
+  }
+
+  if (!kind && !id) return empty
+
+  if (kind === "service" && id) {
+    const [row] = await db
+      .select({ id: services.id })
+      .from(services)
+      .where(and(eq(services.id, id), eq(services.userId, userId)))
+      .limit(1)
+    if (!row) return { error: "That service is no longer available." }
+    return { ...empty, attachedServiceId: id }
+  }
+
+  if (kind === "project" && id) {
+    const [row] = await db
+      .select({ id: portfolioProjects.id })
+      .from(portfolioProjects)
+      .where(and(eq(portfolioProjects.id, id), eq(portfolioProjects.userId, userId)))
+      .limit(1)
+    if (!row) return { error: "That project is no longer available." }
+    return { ...empty, attachedProjectId: id }
+  }
+
+  if (kind === "testimonial" && id) {
+    const [row] = await db
+      .select({ id: testimonials.id })
+      .from(testimonials)
+      .where(and(eq(testimonials.id, id), eq(testimonials.userId, userId)))
+      .limit(1)
+    if (!row) return { error: "That testimonial is no longer available." }
+    return { ...empty, attachedTestimonialId: id }
+  }
+
+  return { error: "Invalid attachment." }
+}
+
 /**
  * Creates a top-level post, or — when `replyToId` is present in the
  * form data — a reply. Replies are ordinary `posts` rows: this is what
@@ -104,7 +166,17 @@ export async function createPost(
   if (media === null) {
     return { success: false, error: "Invalid media attachment." }
   }
-  if (isHtmlContentEmpty(content) && media.length === 0) {
+
+  const attached = await resolveAttachedItem(userId, formData)
+  if ("error" in attached) {
+    return { success: false, error: attached.error }
+  }
+  const hasAttachment =
+    attached.attachedServiceId !== null ||
+    attached.attachedProjectId !== null ||
+    attached.attachedTestimonialId !== null
+
+  if (isHtmlContentEmpty(content) && media.length === 0 && !hasAttachment) {
     return { success: false, error: "Post can't be empty." }
   }
   if (getPostTextLength(content) > MAX_POST_LENGTH) {
@@ -140,6 +212,9 @@ export async function createPost(
       media: media.length > 0 ? JSON.stringify(media) : null,
       replyToId,
       isReply: Boolean(replyToId),
+      attachedServiceId: attached.attachedServiceId,
+      attachedProjectId: attached.attachedProjectId,
+      attachedTestimonialId: attached.attachedTestimonialId,
     })
 
     if (replyToId) {

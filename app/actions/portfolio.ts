@@ -6,7 +6,7 @@ import { del } from "@vercel/blob"
 import { and, eq } from "drizzle-orm"
 import { getSessionWithRetry } from "@/lib/auth"
 import { db } from "@/lib/db"
-import { portfolioProjects, testimonials } from "@/lib/db/schema"
+import { portfolioProjects, posts, testimonials } from "@/lib/db/schema"
 import {
   mediaUrlToPathname,
   validateGalleryMedia,
@@ -292,6 +292,14 @@ export async function deletePortfolioProject(id: string): Promise<ActionResult> 
     .set({ projectId: null })
     .where(and(eq(testimonials.projectId, id), eq(testimonials.userId, userId)))
 
+  // Same for any post that shared this project to the feed — clear
+  // the attachment rather than leave the embedded preview pointing at
+  // a deleted row.
+  await db
+    .update(posts)
+    .set({ attachedProjectId: null })
+    .where(and(eq(posts.attachedProjectId, id), eq(posts.userId, userId)))
+
   // Best-effort cleanup of the project's uploaded images. A failure
   // here shouldn't fail the delete — the row is already gone.
   const row = rows[0]
@@ -317,6 +325,7 @@ export async function deletePortfolioProject(id: string): Promise<ActionResult> 
   }
 
   revalidatePortfolio()
+  revalidatePath("/home")
 
   return { success: true }
 }

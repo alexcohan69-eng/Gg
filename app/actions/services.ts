@@ -6,7 +6,7 @@ import { del } from "@vercel/blob"
 import { and, eq } from "drizzle-orm"
 import { getSessionWithRetry } from "@/lib/auth"
 import { db } from "@/lib/db"
-import { services, testimonials } from "@/lib/db/schema"
+import { posts, services, testimonials } from "@/lib/db/schema"
 import {
   mediaUrlToPathname,
   validateGalleryMedia,
@@ -373,6 +373,14 @@ export async function deleteService(id: string): Promise<ActionResult> {
     .set({ serviceId: null })
     .where(and(eq(testimonials.serviceId, id), eq(testimonials.userId, userId)))
 
+  // Same for any post that shared this service to the feed — clear
+  // the attachment rather than leave the embedded preview pointing at
+  // a deleted row.
+  await db
+    .update(posts)
+    .set({ attachedServiceId: null })
+    .where(and(eq(posts.attachedServiceId, id), eq(posts.userId, userId)))
+
   // Best-effort cleanup of the listing's uploaded images. A failure
   // here shouldn't fail the delete — the row is already gone.
   const row = rows[0]
@@ -397,6 +405,7 @@ export async function deleteService(id: string): Promise<ActionResult> {
   }
 
   revalidateServices()
+  revalidatePath("/home")
 
   return { success: true }
 }

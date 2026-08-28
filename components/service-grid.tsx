@@ -10,12 +10,14 @@ import {
   MoreHorizontalIcon,
   PencilIcon,
   PlusIcon,
+  ShareIcon,
   Trash2Icon,
 } from "lucide-react"
 import { deleteService, moveService } from "@/app/actions/services"
 import type { Service } from "@/lib/services"
 import { ServiceCard } from "@/components/service-card"
 import { ServiceDialog } from "@/components/service-editor"
+import { ShareToFeedDialog } from "@/components/share-to-feed-dialog"
 import { Button } from "@/components/ui/button"
 import {
   Empty,
@@ -49,18 +51,21 @@ export const MAX_SERVICES = 30
 function OwnerServiceTile({
   service,
   profileIdentifier,
+  currentUser,
   isFirst,
   isLast,
   onChanged,
 }: {
   service: Service
   profileIdentifier: string
+  currentUser: { name: string; image?: string | null }
   isFirst: boolean
   isLast: boolean
   onChanged: () => void
 }) {
   const [editOpen, setEditOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
+  const [shareOpen, setShareOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
 
   function handleMove(direction: "up" | "down") {
@@ -123,6 +128,10 @@ function OwnerServiceTile({
               Move down
             </DropdownMenuItem>
             <DropdownMenuSeparator />
+            <DropdownMenuItem disabled={isPending} onClick={() => setShareOpen(true)}>
+              <ShareIcon data-icon="inline-start" />
+              Share to feed
+            </DropdownMenuItem>
             <DropdownMenuItem disabled={isPending} onClick={() => setEditOpen(true)}>
               <PencilIcon data-icon="inline-start" />
               Edit service
@@ -140,6 +149,18 @@ function OwnerServiceTile({
       </div>
 
       <ServiceDialog open={editOpen} onOpenChange={setEditOpen} service={service} onSaved={onChanged} />
+
+      <ShareToFeedDialog
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        user={currentUser}
+        attachedItem={{
+          kind: "service",
+          id: service.id,
+          label: service.title,
+          sublabel: `From $${(service.packages.length > 0 ? Math.min(...service.packages.map((pkg) => pkg.price)) : service.startingPrice).toLocaleString()} · ${service.packages.length > 0 ? Math.min(...service.packages.map((pkg) => pkg.deliveryDays)) : service.deliveryDays} days`,
+        }}
+      />
 
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <AlertDialogContent>
@@ -178,11 +199,14 @@ export function ServiceGrid({
   profileIdentifier,
   isSelf,
   name,
+  currentUser,
 }: {
   services: Service[]
   profileIdentifier: string
   isSelf: boolean
   name: string
+  /** The viewer's own name/image, used for the "Share to feed" composer preview — only ever rendered when `isSelf`. */
+  currentUser: { name: string; image?: string | null }
 }) {
   const router = useRouter()
   const [addOpen, setAddOpen] = useState(false)
@@ -256,6 +280,7 @@ export function ServiceGrid({
               key={service.id}
               service={service}
               profileIdentifier={profileIdentifier}
+              currentUser={currentUser}
               isFirst={index === 0}
               isLast={index === services.length - 1}
               onChanged={handleChanged}
