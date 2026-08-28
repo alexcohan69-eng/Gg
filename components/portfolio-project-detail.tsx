@@ -303,6 +303,19 @@ export function PortfolioProjectDetail({
             onSaved={handleChanged}
           />
 
+          <PublishToFeedDialog
+            open={publishOpen}
+            onOpenChange={setPublishOpen}
+            item={{
+              type: "project",
+              id: project.id,
+              title: project.title,
+              subtitle: project.tagline,
+              image: project.coverImage,
+              imageType: project.coverImageType,
+            }}
+          />
+
           <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
             <AlertDialogContent>
               <AlertDialogHeader>
