@@ -60,31 +60,40 @@ export function TestimonialCard({ testimonial }: { testimonial: Testimonial }) {
       ) : null}
 
       {testimonial.media.length > 0 ? (
-        <div className="grid grid-cols-4 gap-1.5">
+        <div className="-mx-5 flex flex-col gap-1.5">
           {testimonial.media.map((item, index) => (
             <button
               key={item.url}
               type="button"
               onClick={() => setLightboxIndex(index)}
               aria-label={`View proof media ${index + 1} from ${testimonial.authorName}`}
-              className="group relative aspect-square overflow-hidden rounded-lg border border-border bg-muted"
+              className="group relative aspect-video w-full overflow-hidden border-y border-border bg-muted"
             >
               {item.type === "video" ? (
                 <>
                   <video src={item.url} muted playsInline preload="metadata" className="size-full object-cover" />
                   <div className="absolute inset-0 flex items-center justify-center bg-black/10">
-                    <PlayIcon className="size-3 fill-background text-background" aria-hidden="true" />
+                    <PlayIcon className="size-8 fill-background text-background" aria-hidden="true" />
                   </div>
                 </>
               ) : (
                 <Image
                   src={item.url}
-                  alt={`Proof media ${index + 1} from ${testimonial.authorName}`}
+                  alt={
+                    item.type === "gif"
+                      ? `GIF ${index + 1} from ${testimonial.authorName}`
+                      : `Proof media ${index + 1} from ${testimonial.authorName}`
+                  }
                   fill
                   unoptimized
                   className="object-cover transition-transform duration-300 group-hover:scale-105"
                 />
               )}
+              {item.type === "gif" ? (
+                <span className="absolute bottom-1.5 left-1.5 rounded bg-background/80 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-foreground backdrop-blur-sm">
+                  GIF
+                </span>
+              ) : null}
             </button>
           ))}
         </div>
