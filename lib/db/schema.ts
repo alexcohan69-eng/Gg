@@ -104,6 +104,16 @@ export const posts = pgTable("posts", {
   replyToId: text("replyToId"),
   repostOfId: text("repostOfId"),
   quoteOfId: text("quoteOfId"),
+  // At most one of these is ever set — the post is a native post that
+  // also embeds a preview card linking back to one of the author's own
+  // services/portfolioProjects/testimonials rows. Plain text columns,
+  // no FK (Aurora DSQL has no foreign key constraints); referential
+  // integrity (clearing the link if the linked row is deleted) is
+  // enforced in application code — see the delete actions in
+  // app/actions/services.ts / portfolio.ts / testimonials.ts.
+  attachedServiceId: text("attachedServiceId"),
+  attachedProjectId: text("attachedProjectId"),
+  attachedTestimonialId: text("attachedTestimonialId"),
   isReply: boolean("isReply").notNull().default(false),
   isRepost: boolean("isRepost").notNull().default(false),
   likeCount: integer("likeCount").notNull().default(0),
