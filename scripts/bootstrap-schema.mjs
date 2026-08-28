@@ -297,6 +297,20 @@ const statements = [
   `create index async if not exists testimonials_serviceId_idx on "testimonials" ("serviceId")`,
   `create index async if not exists testimonials_projectId_idx on "testimonials" ("projectId")`,
 
+  // Personal API keys for the public REST API (/api/v1/*). Only the
+  // SHA-256 hash of the secret is stored.
+  `create table if not exists "apiKeys" (
+    id text primary key,
+    "userId" text not null,
+    name text not null,
+    "keyHash" text not null unique,
+    "keyPrefix" text not null,
+    "lastUsedAt" timestamp,
+    "revokedAt" timestamp,
+    "createdAt" timestamp not null default now()
+  )`,
+  `create index async if not exists apiKeys_userId_idx on "apiKeys" ("userId")`,
+
   // Moderation MVP: blocks + reports
   `create table if not exists "blocks" (
     id text primary key,

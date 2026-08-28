@@ -9,7 +9,9 @@ import { createNotification, type NotificationType } from "@/lib/notifications"
 import { isBlockedEitherWay } from "@/lib/blocks"
 import { logActionError } from "@/lib/log-action-error"
 
-async function getUserId() {
+/** See the matching comment in app/actions/posts.ts for what `apiUserId` is for. */
+async function getUserId(apiUserId?: string) {
+  if (apiUserId) return apiUserId
   const session = await getSessionWithRetry({ headers: await headers() })
   if (!session?.user) throw new Error("Unauthorized")
   return session.user.id
@@ -118,9 +120,9 @@ async function assertNotBlockedByPostAuthor(userId: string, postId: string) {
   }
 }
 
-export async function likePost(postId: string): Promise<InteractionResult> {
+export async function likePost(postId: string, apiUserId?: string): Promise<InteractionResult> {
   try {
-    const userId = await getUserId()
+    const userId = await getUserId(apiUserId)
     await assertNotBlockedByPostAuthor(userId, postId)
     const inserted = await addInteraction(likes, "likeCount", userId, postId)
     if (inserted) await notifyPostAction(postId, userId, "like")
@@ -134,9 +136,9 @@ export async function likePost(postId: string): Promise<InteractionResult> {
   }
 }
 
-export async function unlikePost(postId: string): Promise<InteractionResult> {
+export async function unlikePost(postId: string, apiUserId?: string): Promise<InteractionResult> {
   try {
-    const userId = await getUserId()
+    const userId = await getUserId(apiUserId)
     await removeInteraction(likes, "likeCount", userId, postId)
     return { success: true }
   } catch (error) {

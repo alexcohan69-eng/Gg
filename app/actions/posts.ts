@@ -25,7 +25,16 @@ import {
  type MediaType,
 } from "@/lib/media"
 
-async function getUserId() {
+/**
+ * Resolves the acting userId. `apiUserId` is passed by the `/api/v1/*`
+ * route wrappers once they've already authenticated the caller (via
+ * session cookie or personal API key, see `lib/api/auth.ts`) — this
+ * lets the public API reuse this exact business logic instead of
+ * duplicating it, while the browser-driven call sites (form actions)
+ * keep working unchanged since they never pass a second argument.
+ */
+async function getUserId(apiUserId?: string) {
+  if (apiUserId) return apiUserId
   const session = await getSessionWithRetry({ headers: await headers() })
   if (!session?.user) throw new Error("Unauthorized")
   return session.user.id
@@ -146,8 +155,9 @@ async function resolvePostAttachment(userId: string, formData: FormData): Promis
  */
 export async function createPost(
   formData: FormData,
+  apiUserId?: string,
 ): Promise<PostActionResult> {
-  const userId = await getUserId()
+  const userId = await getUserId(apiUserId)
 
   // The composer submits rich-text HTML (bold/italic/links/lists/etc).
   // Sanitize it here — this is the real security boundary, since the
@@ -234,8 +244,8 @@ export async function createPost(
   return { success: true }
 }
 
-export async function deletePost(postId: string): Promise<PostActionResult> {
-  const userId = await getUserId()
+export async function deletePost(postId: string, apiUserId?: string): Promise<PostActionResult> {
+  const userId = await getUserId(apiUserId)
 
   // Scope the delete by userId so a user can only ever delete their own
   // posts — there is no RLS on Aurora, so this check is what protects rows.

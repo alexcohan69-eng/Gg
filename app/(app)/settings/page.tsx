@@ -12,6 +12,8 @@ import { SkillsEditor } from "@/components/skills-editor"
 import { WorkflowStepsEditor } from "@/components/workflow-steps-editor"
 import { WorkExperienceEditor } from "@/components/work-experience-editor"
 import { SignOutButton } from "@/components/sign-out-button"
+import { ApiKeysManager } from "@/components/api-keys-manager"
+import { listApiKeys } from "@/lib/api-keys"
 import {
   Card,
   CardHeader,
@@ -38,9 +40,10 @@ export default async function SettingsPage() {
     bannerImage?: string | null
   }
 
-  const [careerProfile, workExperience] = await Promise.all([
+  const [careerProfile, workExperience, apiKeys] = await Promise.all([
     getCareerProfile(user.id),
     getWorkExperience(user.id),
+    listApiKeys(user.id),
   ])
 
   return (
@@ -131,6 +134,26 @@ export default async function SettingsPage() {
           </CardHeader>
           <CardContent>
             <WorkExperienceEditor experience={workExperience} />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>API keys</CardTitle>
+            <CardDescription>
+              Generate personal keys to call the Pulse API from your own
+              apps and scripts.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ApiKeysManager
+              initialKeys={apiKeys.map((key) => ({
+                ...key,
+                lastUsedAt: key.lastUsedAt?.toISOString() ?? null,
+                createdAt: key.createdAt.toISOString(),
+                revokedAt: key.revokedAt?.toISOString() ?? null,
+              }))}
+            />
           </CardContent>
         </Card>
 
