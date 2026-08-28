@@ -264,6 +264,31 @@ export const services = pgTable("services", {
 })
 
 /**
+ * Client testimonials/reviews shown on the profile's Testimonials tab —
+ * a short quote attributed to a client, plus their name/title and an
+ * optional 1-5 star rating. Same self-managed, owner-curated shape as
+ * `portfolioProjects`/`services` (`sortOrder` for manual reordering),
+ * but without a gallery or pricing since a testimonial is just a quote.
+ * See lib/testimonials.ts for the read helpers.
+ */
+export const testimonials = pgTable("testimonials", {
+  id: text("id").primaryKey(),
+  userId: text("userId").notNull(),
+  authorName: text("authorName").notNull(),
+  // e.g. "Founder, Acme Co." — optional, shown under the author name.
+  authorTitle: text("authorTitle"),
+  authorAvatar: text("authorAvatar"),
+  // 1-5, optional — a testimonial can omit a star rating.
+  rating: integer("rating"),
+  content: text("content").notNull(),
+  // Optional label for what the testimonial is about, e.g. "Brand redesign".
+  projectTitle: text("projectTitle"),
+  sortOrder: integer("sortOrder").notNull().default(0),
+  createdAt: timestamp("createdAt").notNull().defaultNow(),
+  updatedAt: timestamp("updatedAt").notNull().defaultNow(),
+})
+
+/**
  * Moderation reports for the report-post / report-user MVP. `reason`
  * is a small closed set of strings (see lib/moderation.ts) rather than
  * its own enum table. `status` + `reviewedBy`/`reviewedAt` back the
