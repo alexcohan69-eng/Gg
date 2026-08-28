@@ -319,6 +319,28 @@ export const testimonials = pgTable("testimonials", {
 })
 
 /**
+ * Personal access keys for the public REST API (`/api/v1/*`), so
+ * external developers can authenticate without a browser session.
+ * Only a sha256 hash of the secret is ever stored — the raw key
+ * (`pulse_<random>`) is shown once at creation time, GitHub/Stripe
+ * style. `keyPrefix` is the first few characters of the raw key,
+ * kept in the clear so the settings UI can show "which key is this"
+ * without being able to reconstruct the secret. No FK on `userId`
+ * (Aurora DSQL has none) — scoped in application code like every
+ * other app table.
+ */
+export const apiKeys = pgTable("apiKeys", {
+  id: text("id").primaryKey(),
+  userId: text("userId").notNull(),
+  name: text("name").notNull(),
+  keyPrefix: text("keyPrefix").notNull(),
+  keyHash: text("keyHash").notNull(),
+  lastUsedAt: timestamp("lastUsedAt"),
+  createdAt: timestamp("createdAt").notNull().defaultNow(),
+  revokedAt: timestamp("revokedAt"),
+})
+
+/**
  * Moderation reports for the report-post / report-user MVP. `reason`
  * is a small closed set of strings (see lib/moderation.ts) rather than
  * its own enum table. `status` + `reviewedBy`/`reviewedAt` back the

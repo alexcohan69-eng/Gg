@@ -323,6 +323,21 @@ const statements = [
   `create unique index async if not exists reports_reporter_target_uidx on "reports" ("reporterId", "targetType", "targetId")`,
   // Backs the admin review queue's "open reports first" listing.
   `create index async if not exists reports_status_createdAt_idx on "reports" ("status", "createdAt")`,
+
+  // Public REST API (/api/v1/*) personal access keys. Only a sha256
+  // hash of the raw secret is ever stored.
+  `create table if not exists "apiKeys" (
+    id text primary key,
+    "userId" text not null,
+    name text not null,
+    "keyPrefix" text not null,
+    "keyHash" text not null,
+    "lastUsedAt" timestamp,
+    "createdAt" timestamp not null default now(),
+    "revokedAt" timestamp
+  )`,
+  `create index async if not exists apiKeys_userId_idx on "apiKeys" ("userId")`,
+  `create unique index async if not exists apiKeys_keyHash_uidx on "apiKeys" ("keyHash")`,
 ]
 
 const client = await pool.connect()
