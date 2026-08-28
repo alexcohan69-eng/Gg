@@ -6,7 +6,7 @@ import { del } from "@vercel/blob"
 import { and, eq } from "drizzle-orm"
 import { getSessionWithRetry } from "@/lib/auth"
 import { db } from "@/lib/db"
-import { portfolioProjects } from "@/lib/db/schema"
+import { portfolioProjects, testimonials } from "@/lib/db/schema"
 import {
   mediaUrlToPathname,
   validateGalleryMedia,
@@ -283,6 +283,14 @@ export async function deletePortfolioProject(id: string): Promise<ActionResult> 
   await db
     .delete(portfolioProjects)
     .where(and(eq(portfolioProjects.id, id), eq(portfolioProjects.userId, userId)))
+
+  // No FK constraint (Aurora DSQL has none), so any testimonial
+  // linked to this project would otherwise keep pointing at a
+  // deleted id — clear the link instead of leaving it dangling.
+  await db
+    .update(testimonials)
+    .set({ projectId: null })
+    .where(and(eq(testimonials.projectId, id), eq(testimonials.userId, userId)))
 
   // Best-effort cleanup of the project's uploaded images. A failure
   // here shouldn't fail the delete — the row is already gone.

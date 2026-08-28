@@ -274,6 +274,17 @@ export const services = pgTable("services", {
 export const testimonials = pgTable("testimonials", {
   id: text("id").primaryKey(),
   userId: text("userId").notNull(),
+  // Optional links to one of the owner's own services/portfolioProjects
+  // rows — at most one of the two is ever set (a testimonial is about
+  // either a service or a case study, not both). Plain text columns,
+  // no FK (Aurora DSQL has no foreign key constraints); referential
+  // integrity (and clearing the link if the linked row is deleted) is
+  // enforced in application code — see app/actions/testimonials.ts and
+  // the delete actions in app/actions/services.ts / portfolio.ts. Used
+  // to surface a "Client reviews" section on the service/project detail
+  // pages (see lib/testimonials.ts's getTestimonialsForService/Project).
+  serviceId: text("serviceId"),
+  projectId: text("projectId"),
   authorName: text("authorName").notNull(),
   // e.g. "Founder, Acme Co." — optional, shown under the author name.
   authorTitle: text("authorTitle"),

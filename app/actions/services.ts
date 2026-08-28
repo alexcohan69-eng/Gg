@@ -6,7 +6,7 @@ import { del } from "@vercel/blob"
 import { and, eq } from "drizzle-orm"
 import { getSessionWithRetry } from "@/lib/auth"
 import { db } from "@/lib/db"
-import { services } from "@/lib/db/schema"
+import { services, testimonials } from "@/lib/db/schema"
 import {
   mediaUrlToPathname,
   validateGalleryMedia,
@@ -364,6 +364,14 @@ export async function deleteService(id: string): Promise<ActionResult> {
     .limit(1)
 
   await db.delete(services).where(and(eq(services.id, id), eq(services.userId, userId)))
+
+  // No FK constraint (Aurora DSQL has none), so any testimonial
+  // linked to this service would otherwise keep pointing at a
+  // deleted id — clear the link instead of leaving it dangling.
+  await db
+    .update(testimonials)
+    .set({ serviceId: null })
+    .where(and(eq(testimonials.serviceId, id), eq(testimonials.userId, userId)))
 
   // Best-effort cleanup of the listing's uploaded images. A failure
   // here shouldn't fail the delete — the row is already gone.

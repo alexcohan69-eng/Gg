@@ -121,6 +121,21 @@ export async function getServices(userId: string): Promise<Service[]> {
   return rows.map(toService)
 }
 
+/**
+ * Lightweight `{ id, title }` list of a profile's services, used to
+ * populate the "link this testimonial to a service" picker in the
+ * testimonial editor without loading each listing's full gallery/packages.
+ */
+export async function getServiceOptions(userId: string): Promise<{ id: string; title: string }[]> {
+  const rows = await db
+    .select({ id: services.id, title: services.title })
+    .from(services)
+    .where(eq(services.userId, userId))
+    .orderBy(asc(services.sortOrder))
+
+  return rows
+}
+
 /** A single service listing for the detail page. Returns null if missing or not owned by that user. */
 export async function getService(userId: string, id: string): Promise<Service | null> {
   const rows = await db

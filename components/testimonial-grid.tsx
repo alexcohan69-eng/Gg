@@ -51,11 +51,15 @@ function OwnerTestimonialTile({
   isFirst,
   isLast,
   onChanged,
+  serviceOptions,
+  projectOptions,
 }: {
   testimonial: Testimonial
   isFirst: boolean
   isLast: boolean
   onChanged: () => void
+  serviceOptions: { id: string; title: string }[]
+  projectOptions: { id: string; title: string }[]
 }) {
   const [editOpen, setEditOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
@@ -127,7 +131,14 @@ function OwnerTestimonialTile({
         </DropdownMenu>
       </div>
 
-      <TestimonialDialog open={editOpen} onOpenChange={setEditOpen} testimonial={testimonial} onSaved={onChanged} />
+      <TestimonialDialog
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        testimonial={testimonial}
+        onSaved={onChanged}
+        serviceOptions={serviceOptions}
+        projectOptions={projectOptions}
+      />
 
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <AlertDialogContent>
@@ -164,10 +175,14 @@ export function TestimonialGrid({
   testimonials,
   isSelf,
   name,
+  serviceOptions = [],
+  projectOptions = [],
 }: {
   testimonials: Testimonial[]
   isSelf: boolean
   name: string
+  serviceOptions?: { id: string; title: string }[]
+  projectOptions?: { id: string; title: string }[]
 }) {
   const router = useRouter()
   const [addOpen, setAddOpen] = useState(false)
@@ -206,7 +221,13 @@ export function TestimonialGrid({
           ) : null}
         </Empty>
 
-        <TestimonialDialog open={addOpen} onOpenChange={setAddOpen} onSaved={handleChanged} />
+        <TestimonialDialog
+          open={addOpen}
+          onOpenChange={setAddOpen}
+          onSaved={handleChanged}
+          serviceOptions={serviceOptions}
+          projectOptions={projectOptions}
+        />
       </div>
     )
   }
@@ -243,6 +264,8 @@ export function TestimonialGrid({
               isFirst={index === 0}
               isLast={index === testimonials.length - 1}
               onChanged={handleChanged}
+              serviceOptions={serviceOptions}
+              projectOptions={projectOptions}
             />
           ) : (
             <TestimonialCard key={testimonial.id} testimonial={testimonial} />
@@ -250,7 +273,13 @@ export function TestimonialGrid({
         )}
       </div>
 
-      <TestimonialDialog open={addOpen} onOpenChange={setAddOpen} onSaved={handleChanged} />
+      <TestimonialDialog
+        open={addOpen}
+        onOpenChange={setAddOpen}
+        onSaved={handleChanged}
+        serviceOptions={serviceOptions}
+        projectOptions={projectOptions}
+      />
     </div>
   )
 }

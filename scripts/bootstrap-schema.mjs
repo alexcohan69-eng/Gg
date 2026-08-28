@@ -288,6 +288,14 @@ const statements = [
   // Added after the table already existed in prior environments —
   // JSON-encoded array of proof photo/video MediaAttachment objects.
   `alter table "testimonials" add column if not exists media text`,
+  // Optional link to one of the owner's services/portfolioProjects —
+  // at most one of the two is set per testimonial. No FK (Aurora DSQL
+  // has none); powers the "Client reviews" section on service/project
+  // detail pages.
+  `alter table "testimonials" add column if not exists "serviceId" text`,
+  `alter table "testimonials" add column if not exists "projectId" text`,
+  `create index async if not exists testimonials_serviceId_idx on "testimonials" ("serviceId")`,
+  `create index async if not exists testimonials_projectId_idx on "testimonials" ("projectId")`,
 
   // Moderation MVP: blocks + reports
   `create table if not exists "blocks" (

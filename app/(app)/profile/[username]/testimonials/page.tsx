@@ -3,6 +3,8 @@ import { headers } from "next/headers"
 import { notFound, redirect } from "next/navigation"
 import { getSessionWithRetry } from "@/lib/auth"
 import { getTestimonials } from "@/lib/testimonials"
+import { getServiceOptions } from "@/lib/services"
+import { getPortfolioProjectOptions } from "@/lib/portfolio"
 import { getFollowCounts, getProfileByIdentifier, isFollowing } from "@/lib/follows"
 import { getBlockState } from "@/lib/blocks"
 import { profileHref } from "@/lib/utils"
@@ -51,14 +53,20 @@ export default async function ProfileTestimonialsPage({
     year: "numeric",
   })
 
-  const [testimonials, followCounts, viewerIsFollowing, blockState] = await Promise.all([
-    getTestimonials(profile.id),
-    getFollowCounts(profile.id),
-    isSelf ? Promise.resolve(false) : isFollowing(session.user.id, profile.id),
-    isSelf
-      ? Promise.resolve({ viewerBlockedTarget: false, targetBlockedViewer: false })
-      : getBlockState(session.user.id, profile.id),
-  ])
+  const [testimonials, followCounts, viewerIsFollowing, blockState, serviceOptions, projectOptions] =
+    await Promise.all([
+      getTestimonials(profile.id),
+      getFollowCounts(profile.id),
+      isSelf ? Promise.resolve(false) : isFollowing(session.user.id, profile.id),
+      isSelf
+        ? Promise.resolve({ viewerBlockedTarget: false, targetBlockedViewer: false })
+        : getBlockState(session.user.id, profile.id),
+      // Only the owner ever opens the editor, but fetching this for
+      // every viewer keeps the query list simple — it's a cheap,
+      // small (id, title) projection either way.
+      getServiceOptions(profile.id),
+      getPortfolioProjectOptions(profile.id),
+    ])
 
   return (
     <div className="flex flex-col">
@@ -66,7 +74,15 @@ export default async function ProfileTestimonialsPage({
         name={profile.name}
         username={profile.username ?? "user"}
         leading={<BackButton />}
-        trailing={isSelf ? <TestimonialAddButton testimonialCount={testimonials.length} /> : null}
+        trailing={
+          isSelf ? (
+            <TestimonialAddButton
+              testimonialCount={testimonials.length}
+              serviceOptions={serviceOptions}
+              projectOptions={projectOptions}
+            />
+          ) : null
+        }
       />
 
       <ProfileHeader
@@ -91,7 +107,13 @@ export default async function ProfileTestimonialsPage({
 
       <ProfileTabs identifier={username} current="testimonials" />
 
-      <TestimonialGrid testimonials={testimonials} isSelf={isSelf} name={profile.name} />
+      <TestimonialGrid
+        testimonials={testimonials}
+        isSelf={isSelf}
+        name={profile.name}
+        serviceOptions={serviceOptions}
+        projectOptions={projectOptions}
+      />
     </div>
   )
 }
