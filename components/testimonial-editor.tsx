@@ -296,7 +296,10 @@ function LinkPicker({
   return (
     <Field>
       <FieldLabel htmlFor="testimonial-link">Link to</FieldLabel>
-      <Select value={value || "none"} onValueChange={(next) => onChange(next === "none" ? "" : next)}>
+      <Select
+        value={value || "none"}
+        onValueChange={(next) => onChange(!next || next === "none" ? "" : next)}
+      >
         <SelectTrigger id="testimonial-link" className="w-full">
           <SelectValue placeholder="None" />
         </SelectTrigger>
