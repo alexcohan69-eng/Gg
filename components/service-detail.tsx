@@ -10,6 +10,7 @@ import {
   MoreHorizontalIcon,
   PencilIcon,
   PlayIcon,
+  RadioTowerIcon,
   ShoppingBagIcon,
   Trash2Icon,
 } from "lucide-react"
@@ -18,6 +19,7 @@ import { sanitizePostHtml } from "@/lib/sanitize-html"
 import type { Service } from "@/lib/services"
 import type { Testimonial } from "@/lib/testimonials"
 import { ServiceDialog } from "@/components/service-editor"
+import { PublishToFeedDialog } from "@/components/publish-to-feed-dialog"
 import { ServicePackages } from "@/components/service-packages"
 import { ServiceIncludes } from "@/components/service-includes"
 import { ServiceProcess } from "@/components/service-process"
@@ -65,6 +67,7 @@ export function ServiceDetail({
   const router = useRouter()
   const [editOpen, setEditOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
+  const [publishOpen, setPublishOpen] = useState(false)
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
   const [isPending, startTransition] = useTransition()
 
@@ -188,6 +191,10 @@ export function ServiceDetail({
                     }
                   />
                   <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => setPublishOpen(true)}>
+                      <RadioTowerIcon data-icon="inline-start" />
+                      Publish to feed
+                    </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => setEditOpen(true)}>
                       <PencilIcon data-icon="inline-start" />
                       Edit service
@@ -396,6 +403,19 @@ export function ServiceDetail({
       {isSelf ? (
         <>
           <ServiceDialog open={editOpen} onOpenChange={setEditOpen} service={service} onSaved={handleChanged} />
+
+          <PublishToFeedDialog
+            open={publishOpen}
+            onOpenChange={setPublishOpen}
+            item={{
+              type: "service",
+              id: service.id,
+              title: service.title,
+              subtitle: service.tagline,
+              image: service.coverImage,
+              imageType: service.coverImageType,
+            }}
+          />
 
           <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
             <AlertDialogContent>

@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, ilike, notInArray, or, sql } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { bookmarks, follows, likes, posts, reposts, user } from "@/lib/db/schema"
-import { feedBaseSelection, withLikeAndRepostJoins, type FeedPost } from "@/lib/posts"
+import { feedBaseSelection, finalizeFeedPosts, withLikeAndRepostJoins, type FeedPost } from "@/lib/posts"
 import type { FollowListUser } from "@/lib/follows"
 
 const SEARCH_LIMIT = 20
@@ -102,7 +102,7 @@ export async function searchPosts(
       and(eq(bookmarks.postId, posts.id), eq(bookmarks.userId, viewerId)),
     )
 
-  return withLikeAndRepostJoins(searchQuery, viewerId)
+  const rows = await withLikeAndRepostJoins(searchQuery, viewerId)
     .where(
       and(
         eq(posts.isReply, false),
@@ -112,4 +112,6 @@ export async function searchPosts(
     )
     .orderBy(desc(posts.createdAt))
     .limit(limit)
+
+  return finalizeFeedPosts(rows)
 }

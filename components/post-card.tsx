@@ -32,6 +32,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { ReportDialog } from "@/components/report-dialog"
+import { PostAttachmentCard } from "@/components/post-attachment-card"
 import { cn, getInitials, formatRelativeTime, profileHref } from "@/lib/utils"
 import { sanitizePostHtml } from "@/lib/sanitize-html"
 import type { FeedPost } from "@/lib/posts"
@@ -301,6 +302,13 @@ export function PostCard({
               </div>
             </ClickWrapper>
           )
+        ) : null}
+
+        {post.attachment ? (
+          <PostAttachmentCard
+            attachment={post.attachment}
+            profileIdentifier={post.authorUsername ?? post.authorId}
+          />
         ) : null}
 
         <div className="-ml-2 mt-1 flex max-w-md items-center justify-between text-muted-foreground">

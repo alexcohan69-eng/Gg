@@ -6,7 +6,7 @@ import { del } from "@vercel/blob"
 import { and, eq, sql } from "drizzle-orm"
 import { getSessionWithRetry } from "@/lib/auth"
 import { db } from "@/lib/db"
-import { posts } from "@/lib/db/schema"
+import { portfolioProjects, posts, services, testimonials } from "@/lib/db/schema"
 import { createNotification } from "@/lib/notifications"
 import { isBlockedEitherWay } from "@/lib/blocks"
 import { logActionError } from "@/lib/log-action-error"
@@ -82,6 +82,62 @@ export type PostActionResult = {
   error?: string
 }
 
+type PostAttachment = {
+  attachedServiceId: string | null
+  attachedProjectId: string | null
+  attachedTestimonialId: string | null
+}
+
+const NO_ATTACHMENT: PostAttachment = {
+  attachedServiceId: null,
+  attachedProjectId: null,
+  attachedTestimonialId: null,
+}
+
+/**
+ * Reads the composer's "attach a service/project/testimonial" fields
+ * (a single "attachmentType:attachmentId" value, mirroring the
+ * testimonial editor's own service/project link picker) and verifies
+ * the referenced row is actually owned by this user before trusting
+ * it — a crafted request can't attach someone else's listing to a
+ * "showcase" post this way. An unrecognized or unowned reference is
+ * treated as "no attachment" rather than an error, matching
+ * `resolveTestimonialLink`'s tolerance of a stale/deleted id.
+ */
+async function resolvePostAttachment(userId: string, formData: FormData): Promise<PostAttachment> {
+  const raw = String(formData.get("attachment") ?? "").trim()
+  if (!raw.includes(":")) return NO_ATTACHMENT
+  const [kind, id] = raw.split(":", 2)
+  if (!id) return NO_ATTACHMENT
+
+  if (kind === "service") {
+    const rows = await db
+      .select({ id: services.id })
+      .from(services)
+      .where(and(eq(services.id, id), eq(services.userId, userId)))
+      .limit(1)
+    return rows[0] ? { ...NO_ATTACHMENT, attachedServiceId: id } : NO_ATTACHMENT
+  }
+  if (kind === "project") {
+    const rows = await db
+      .select({ id: portfolioProjects.id })
+      .from(portfolioProjects)
+      .where(and(eq(portfolioProjects.id, id), eq(portfolioProjects.userId, userId)))
+      .limit(1)
+    return rows[0] ? { ...NO_ATTACHMENT, attachedProjectId: id } : NO_ATTACHMENT
+  }
+  if (kind === "testimonial") {
+    const rows = await db
+      .select({ id: testimonials.id })
+      .from(testimonials)
+      .where(and(eq(testimonials.id, id), eq(testimonials.userId, userId)))
+      .limit(1)
+    return rows[0] ? { ...NO_ATTACHMENT, attachedTestimonialId: id } : NO_ATTACHMENT
+  }
+
+  return NO_ATTACHMENT
+}
+
 /**
  * Creates a top-level post, or — when `replyToId` is present in the
  * form data — a reply. Replies are ordinary `posts` rows: this is what
@@ -100,11 +156,18 @@ export async function createPost(
   const replyToIdRaw = formData.get("replyToId")
   const replyToId = replyToIdRaw ? String(replyToIdRaw) : null
   const media = parseMediaAttachments(formData)
+  // A reply is always a reply to the thread it's in — the "publish to
+  // feed" attachment is only meaningful on a top-level showcase post.
+  const attachment = replyToId ? NO_ATTACHMENT : await resolvePostAttachment(userId, formData)
+  const hasAttachment =
+    attachment.attachedServiceId !== null ||
+    attachment.attachedProjectId !== null ||
+    attachment.attachedTestimonialId !== null
 
   if (media === null) {
     return { success: false, error: "Invalid media attachment." }
   }
-  if (isHtmlContentEmpty(content) && media.length === 0) {
+  if (isHtmlContentEmpty(content) && media.length === 0 && !hasAttachment) {
     return { success: false, error: "Post can't be empty." }
   }
   if (getPostTextLength(content) > MAX_POST_LENGTH) {
@@ -140,6 +203,9 @@ export async function createPost(
       media: media.length > 0 ? JSON.stringify(media) : null,
       replyToId,
       isReply: Boolean(replyToId),
+      attachedServiceId: attachment.attachedServiceId,
+      attachedProjectId: attachment.attachedProjectId,
+      attachedTestimonialId: attachment.attachedTestimonialId,
     })
 
     if (replyToId) {

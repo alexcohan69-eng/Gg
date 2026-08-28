@@ -6,7 +6,7 @@ import { del } from "@vercel/blob"
 import { and, eq } from "drizzle-orm"
 import { getSessionWithRetry } from "@/lib/auth"
 import { db } from "@/lib/db"
-import { services, testimonials } from "@/lib/db/schema"
+import { posts, services, testimonials } from "@/lib/db/schema"
 import {
   mediaUrlToPathname,
   validateGalleryMedia,
@@ -34,6 +34,9 @@ function revalidateServices() {
   // segments covers every viewer of them.
   revalidatePath("/profile/[username]/services", "page")
   revalidatePath("/profile/[username]/services/[serviceId]", "page")
+  // A service can also be showcased via a "publish to feed" post, so
+  // an edit/delete needs to bust the home feed's cached preview cards too.
+  revalidatePath("/home")
 }
 
 const MAX_TITLE = 80
@@ -372,6 +375,14 @@ export async function deleteService(id: string): Promise<ActionResult> {
     .update(testimonials)
     .set({ serviceId: null })
     .where(and(eq(testimonials.serviceId, id), eq(testimonials.userId, userId)))
+
+  // Same for any "publish to feed" post that showcased this listing —
+  // the post itself stays up, it just stops rendering the (now
+  // deleted) preview card.
+  await db
+    .update(posts)
+    .set({ attachedServiceId: null })
+    .where(and(eq(posts.attachedServiceId, id), eq(posts.userId, userId)))
 
   // Best-effort cleanup of the listing's uploaded images. A failure
   // here shouldn't fail the delete — the row is already gone.

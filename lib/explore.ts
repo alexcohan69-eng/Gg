@@ -1,7 +1,7 @@
 import { and, desc, eq, gte, ne, notInArray, sql } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { bookmarks, follows, likes, posts, reposts, user } from "@/lib/db/schema"
-import { feedBaseSelection, withLikeAndRepostJoins, type FeedPost } from "@/lib/posts"
+import { feedBaseSelection, finalizeFeedPosts, withLikeAndRepostJoins, type FeedPost } from "@/lib/posts"
 import type { FollowListUser } from "@/lib/follows"
 
 function excludeUsersCondition(excludeUserIds: Set<string>) {
@@ -37,7 +37,7 @@ async function fetchTrendingPosts(
   limit: number,
   cutoff: Date | null,
   excludeUserIds: Set<string>,
-) {
+): Promise<FeedPost[]> {
   const query = db
     .select({
       ...feedBaseSelection,
@@ -57,10 +57,12 @@ async function fetchTrendingPosts(
   const excludeCondition = excludeAuthorsCondition(excludeUserIds)
   if (excludeCondition) conditions.push(excludeCondition)
 
-  return withLikeAndRepostJoins(query, viewerId)
+  const rows = await withLikeAndRepostJoins(query, viewerId)
     .where(and(...conditions))
     .orderBy(desc(trendingScore), desc(posts.createdAt))
     .limit(limit)
+
+  return finalizeFeedPosts(rows)
 }
 
 /**
