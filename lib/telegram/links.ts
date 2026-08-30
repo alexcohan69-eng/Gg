@@ -60,6 +60,36 @@ export async function getLinkByWebhookSecret(secret: string): Promise<TelegramLi
   return rows[0] ?? null
 }
 
+// Registered at most once per cold start. `setWebhook` is idempotent
+// on Telegram's side (calling it again with the same URL is a no-op),
+// so this only exists to avoid one extra network round trip per
+// request — never to guard correctness.
+let builtinWebhookRegistered = false
+
+/**
+ * Points Telegram's `setWebhook` at this deployment's builtin route,
+ * using the shared bot token + `TELEGRAM_WEBHOOK_SECRET`. Called
+ * lazily from `startBuiltinLink` (mirroring how a custom bot's
+ * webhook is registered in `startCustomLink` below) rather than at
+ * module load, because `getSiteUrl()` needs the real request-time
+ * deployment domain — which isn't reliably known until a request
+ * actually comes in.
+ */
+async function ensureBuiltinWebhookRegistered(): Promise<void> {
+  if (builtinWebhookRegistered) return
+  const token = getBuiltinBotToken()
+  const secret = process.env.TELEGRAM_WEBHOOK_SECRET
+  if (!token || !secret) return
+  try {
+    await setWebhook(token, `${getSiteUrl()}/api/telegram/webhook/builtin`, secret)
+    builtinWebhookRegistered = true
+  } catch (error) {
+    // Non-fatal: the deep link still works, and this is retried on
+    // the next call since builtinWebhookRegistered stays false.
+    logActionError("ensureBuiltinWebhookRegistered", error, {})
+  }
+}
+
 /**
  * Starts (or restarts) a built-in-bot link for `userId` and returns
  * the `t.me/<bot>?start=<id>` deep link the settings page renders as
@@ -69,6 +99,7 @@ export async function getLinkByWebhookSecret(secret: string): Promise<TelegramLi
  */
 export async function startBuiltinLink(userId: string): Promise<{ deepLink: string }> {
   const botUsername = getBuiltinBotUsername()
+  await ensureBuiltinWebhookRegistered()
   const existing = await getLinkForUser(userId)
   const id = existing?.id ?? crypto.randomUUID()
 
