@@ -9,6 +9,15 @@ This is a Next.js 16 (App Router) social app called **Pulse**, using:
 
 Follow these steps in order. Skipping the schema step or using the wrong signer package is the most common cause of "it compiles but nothing works" errors.
 
+## 0. Connect the required integrations (v0 environment)
+
+Before installing anything, make sure both integrations below are connected to the project. In v0, call `GetOrRequestIntegration` with `names: ["Amazon Aurora DSQL", "Blob"]` — this checks connection status and, if either is missing, shows the user a one-click connect card. Do not skip this: without both connected, `PGHOST`/`AWS_ROLE_ARN`/`AWS_REGION` (DSQL) and `BLOB_READ_WRITE_TOKEN` (Blob) won't exist and every DB call and file upload will fail.
+
+- **Amazon Aurora DSQL** — the database. Provides `PGHOST`, `PGUSER`, `PGDATABASE`, `PGPORT`, `PGSSLMODE`, `AWS_REGION`, `AWS_ROLE_ARN`, `AWS_RESOURCE_ARN`, `AWS_ACCOUNT_ID`.
+- **Vercel Blob** — file storage for avatars, banners, and post media. Provides `BLOB_READ_WRITE_TOKEN`.
+
+If you're outside v0 (e.g. a plain Vercel deployment), add these through the Vercel dashboard integrations page instead, then `vercel env pull`.
+
 ## 1. Install dependencies
 
 ```bash
@@ -57,6 +66,8 @@ This is idempotent (every statement is `IF NOT EXISTS`), so it's safe to re-run 
 
 If you change `lib/db/schema.ts`, update `scripts/bootstrap-schema.mjs` to match and re-run it — there is no separate migration tool.
 
+**⚠️ Known past drift (already fixed, but re-check if you see similar errors):** `posts.attachedServiceId`, `posts.attachedProjectId`, and `posts.attachedTestimonialId` existed in `lib/db/schema.ts` but were missing from `scripts/bootstrap-schema.mjs`'s `posts` table (no matching `CREATE TABLE` column or follow-up `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`). Sign-up itself succeeded, but the app crashed immediately after with `error: column posts.attachedServiceId does not exist` because the post-signup redirect to `/home` runs `getFeedPosts()`, which selects those columns. This has been fixed by adding the three `ALTER TABLE "posts" ADD COLUMN IF NOT EXISTS ...` statements to the bootstrap script and running it. **Whenever you add a column to `lib/db/schema.ts` on an existing table, always add a matching `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` to `scripts/bootstrap-schema.mjs` (not just a `CREATE TABLE` column, which is a no-op once the table already exists) and re-run the script — otherwise the schema silently drifts and the first query touching the new column crashes at runtime instead of at build time.**
+
 ## 4. ⚠️ Critical: DSQL vs Aurora PostgreSQL signer
 
 `lib/db/index.ts` and `scripts/bootstrap-schema.mjs` MUST both use `DsqlSigner` from `@aws-sdk/dsql-signer`. Do **not** use `Signer` from `@aws-sdk/rds-signer` (that package is for Aurora **PostgreSQL**, a different product with a different auth mechanism). Using the wrong signer causes every DB connection to fail silently or with an opaque auth error, even though the code compiles fine. If you ever see connection/auth errors, check this first.
@@ -87,5 +98,6 @@ pnpm exec tsc --noEmit   # type-check only, no build output
 
 - **"It builds but auth/DB calls fail"** → check you're using `DsqlSigner`, not `Signer` (see step 4), and that `AWS_ROLE_ARN`/`AWS_REGION` are set.
 - **"Table does not exist" errors** → the schema bootstrap script (step 3) was never run against this DB instance.
+- **"column ... does not exist" errors (e.g. sign-up succeeds but redirecting to `/home` crashes)** → `lib/db/schema.ts` has a column that `scripts/bootstrap-schema.mjs` never added (see the "Known past drift" note in step 3). Add the missing `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` statement and re-run the bootstrap script — `CREATE TABLE IF NOT EXISTS` alone won't add columns to a table that already exists.
 - **Login succeeds but immediately looks logged out** → check `lib/auth.ts` cookie config (`sameSite`/`secure`) matches your environment; don't disable CSRF/origin checks to "fix" this.
 - **Env vars "missing" in a script run via Bash** → the dev server auto-loads `.env.development.local`, but ad-hoc Node scripts don't. Use `node --env-file-if-exists=.env.development.local your-script.mjs`.

@@ -146,6 +146,17 @@ const statements = [
   `create index async if not exists posts_userId_idx on "posts" ("userId")`,
   `create index async if not exists posts_replyToId_idx on "posts" ("replyToId")`,
   `create index async if not exists posts_createdAt_idx on "posts" ("createdAt")`,
+  // Added after the table already existed in prior environments — at
+  // most one of these is ever set, linking a native post to a preview
+  // card for one of the author's own services/portfolioProjects/
+  // testimonials rows. No FK (Aurora DSQL has none); referential
+  // integrity is enforced in application code. lib/posts.ts selects
+  // these columns on every feed query, so a fresh cluster missing
+  // them fails signup's post-signup redirect to /home with
+  // "column posts.attachedServiceId does not exist".
+  `alter table "posts" add column if not exists "attachedServiceId" text`,
+  `alter table "posts" add column if not exists "attachedProjectId" text`,
+  `alter table "posts" add column if not exists "attachedTestimonialId" text`,
 
   `create table if not exists "follows" (
     id text primary key,
