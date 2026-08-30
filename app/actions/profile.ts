@@ -21,11 +21,18 @@ export type UpdateProfileResult = {
   error?: string
 }
 
-export async function updateProfile(
+/**
+ * Updates the profile fields (name, username, bio, website, location)
+ * for `userId`. Takes `userId` directly rather than resolving it from
+ * the session, so both the web settings form's session-authenticated
+ * `updateProfile` below and the public `PATCH /api/v1/me` route
+ * (authenticated by API key) share one implementation — see
+ * `createPostForUser` in app/actions/posts.ts for the same pattern.
+ */
+export async function updateProfileForUser(
+  userId: string,
   formData: FormData,
 ): Promise<UpdateProfileResult> {
-  const userId = await getUserId()
-
   const name = String(formData.get("name") ?? "").trim()
   const username = String(formData.get("username") ?? "")
     .trim()
@@ -83,6 +90,14 @@ export async function updateProfile(
   revalidatePath("/settings")
 
   return { success: true }
+}
+
+/** Session-authenticated entry point used by the web settings form. */
+export async function updateProfile(
+  formData: FormData,
+): Promise<UpdateProfileResult> {
+  const userId = await getUserId()
+  return updateProfileForUser(userId, formData)
 }
 
 const MAX_ABOUT_LENGTH = 4000

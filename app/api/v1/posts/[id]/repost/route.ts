@@ -1,21 +1,21 @@
 import type { NextRequest } from "next/server"
-import { authenticateApiRequest, apiSuccess, withApiErrorHandling } from "@/lib/api-auth"
+import { requireApiUser, apiSuccess, withApiErrorHandling } from "@/lib/api-auth"
 import { repostPostForUser, undoRepostForUser } from "@/app/actions/interactions"
 
-/** Repost `:id` as the authenticated API key's owner. */
+/** Repost `:id` as the authenticated API key's owner. Requires a valid API key. */
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   return withApiErrorHandling(async () => {
-    const { userId } = await authenticateApiRequest(request)
+    const userId = await requireApiUser(request)
     const { id } = await params
     const result = await repostPostForUser(userId, id)
     return apiSuccess(result)
   })
 }
 
-/** Undo a repost of `:id` as the authenticated API key's owner. */
+/** Undo a repost of `:id` as the authenticated API key's owner. Requires a valid API key. */
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   return withApiErrorHandling(async () => {
-    const { userId } = await authenticateApiRequest(request)
+    const userId = await requireApiUser(request)
     const { id } = await params
     const result = await undoRepostForUser(userId, id)
     return apiSuccess(result)

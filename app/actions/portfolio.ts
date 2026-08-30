@@ -168,10 +168,14 @@ function parseProjectForm(formData: FormData):
   }
 }
 
-/** Adds a new case study to the end of the profile's Work tab. */
-export async function addPortfolioProject(formData: FormData): Promise<ActionResult> {
-  const userId = await getUserId()
-
+/**
+ * Adds a new case study to the end of `userId`'s Work tab. Takes
+ * `userId` directly so both the web editor's session-authenticated
+ * `addPortfolioProject` below and the public `POST /api/v1/portfolio`
+ * route (authenticated by API key) share one implementation — see
+ * `createPostForUser` in app/actions/posts.ts for the same pattern.
+ */
+export async function addPortfolioProjectForUser(userId: string, formData: FormData): Promise<ActionResult> {
   const parsed = parseProjectForm(formData)
   if ("error" in parsed) return { success: false, error: parsed.error }
 
@@ -204,12 +208,21 @@ export async function addPortfolioProject(formData: FormData): Promise<ActionRes
   return { success: true }
 }
 
-/** Edits an existing case study. */
-export async function updatePortfolioProject(
+/** Session-authenticated entry point used by the web Work editor. */
+export async function addPortfolioProject(formData: FormData): Promise<ActionResult> {
+  const userId = await getUserId()
+  return addPortfolioProjectForUser(userId, formData)
+}
+
+/**
+ * Edits an existing case study owned by `userId`. See
+ * `addPortfolioProjectForUser` above for why this takes `userId` directly.
+ */
+export async function updatePortfolioProjectForUser(
+  userId: string,
   id: string,
   formData: FormData,
 ): Promise<ActionResult> {
-  const userId = await getUserId()
   await assertOwnsProject(userId, id)
 
   const existingRows = await db
@@ -272,9 +285,21 @@ export async function updatePortfolioProject(
   return { success: true }
 }
 
-/** Removes a case study, along with its cover and gallery images. */
-export async function deletePortfolioProject(id: string): Promise<ActionResult> {
+/** Session-authenticated entry point used by the web Work editor. */
+export async function updatePortfolioProject(
+  id: string,
+  formData: FormData,
+): Promise<ActionResult> {
   const userId = await getUserId()
+  return updatePortfolioProjectForUser(userId, id, formData)
+}
+
+/**
+ * Removes a case study owned by `userId`, along with its cover and
+ * gallery images. See `addPortfolioProjectForUser` above for why this
+ * takes `userId` directly.
+ */
+export async function deletePortfolioProjectForUser(userId: string, id: string): Promise<ActionResult> {
   await assertOwnsProject(userId, id)
 
   const rows = await db
@@ -330,6 +355,12 @@ export async function deletePortfolioProject(id: string): Promise<ActionResult> 
   revalidatePortfolio()
 
   return { success: true }
+}
+
+/** Session-authenticated entry point used by the web Work editor. */
+export async function deletePortfolioProject(id: string): Promise<ActionResult> {
+  const userId = await getUserId()
+  return deletePortfolioProjectForUser(userId, id)
 }
 
 /** Swaps a case study's position with its neighbor to reorder the Work grid. */

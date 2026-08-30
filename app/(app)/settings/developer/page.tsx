@@ -55,8 +55,8 @@ export default async function DeveloperSettingsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Button asChild variant="outline">
-              <Link href="/developers">View API docs</Link>
+            <Button variant="outline" nativeButton={false} render={<Link href="/developers" />}>
+              View API docs
             </Button>
           </CardContent>
         </Card>

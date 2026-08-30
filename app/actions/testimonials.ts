@@ -185,10 +185,14 @@ function parseTestimonialForm(formData: FormData):
   }
 }
 
-/** Adds a new testimonial to the end of the profile's Testimonials tab. */
-export async function addTestimonial(formData: FormData): Promise<ActionResult> {
-  const userId = await getUserId()
-
+/**
+ * Adds a new testimonial to the end of `userId`'s Testimonials tab.
+ * Takes `userId` directly so both the web editor's session-authenticated
+ * `addTestimonial` below and the public `POST /api/v1/testimonials`
+ * route (authenticated by API key) share one implementation — see
+ * `createPostForUser` in app/actions/posts.ts for the same pattern.
+ */
+export async function addTestimonialForUser(userId: string, formData: FormData): Promise<ActionResult> {
   const parsed = parseTestimonialForm(formData)
   if ("error" in parsed) return { success: false, error: parsed.error }
 
@@ -223,9 +227,17 @@ export async function addTestimonial(formData: FormData): Promise<ActionResult> 
   return { success: true }
 }
 
-/** Edits an existing testimonial. */
-export async function updateTestimonial(id: string, formData: FormData): Promise<ActionResult> {
+/** Session-authenticated entry point used by the web Testimonials editor. */
+export async function addTestimonial(formData: FormData): Promise<ActionResult> {
   const userId = await getUserId()
+  return addTestimonialForUser(userId, formData)
+}
+
+/**
+ * Edits an existing testimonial owned by `userId`. See
+ * `addTestimonialForUser` above for why this takes `userId` directly.
+ */
+export async function updateTestimonialForUser(userId: string, id: string, formData: FormData): Promise<ActionResult> {
   await assertOwnsTestimonial(userId, id)
 
   const existingRows = await db
@@ -288,9 +300,18 @@ export async function updateTestimonial(id: string, formData: FormData): Promise
   return { success: true }
 }
 
-/** Removes a testimonial, along with its author avatar. */
-export async function deleteTestimonial(id: string): Promise<ActionResult> {
+/** Session-authenticated entry point used by the web Testimonials editor. */
+export async function updateTestimonial(id: string, formData: FormData): Promise<ActionResult> {
   const userId = await getUserId()
+  return updateTestimonialForUser(userId, id, formData)
+}
+
+/**
+ * Removes a testimonial owned by `userId`, along with its author
+ * avatar. See `addTestimonialForUser` above for why this takes
+ * `userId` directly.
+ */
+export async function deleteTestimonialForUser(userId: string, id: string): Promise<ActionResult> {
   await assertOwnsTestimonial(userId, id)
 
   const rows = await db
@@ -336,6 +357,12 @@ export async function deleteTestimonial(id: string): Promise<ActionResult> {
   revalidateTestimonials()
 
   return { success: true }
+}
+
+/** Session-authenticated entry point used by the web Testimonials editor. */
+export async function deleteTestimonial(id: string): Promise<ActionResult> {
+  const userId = await getUserId()
+  return deleteTestimonialForUser(userId, id)
 }
 
 /** Swaps a testimonial's position with its neighbor to reorder the Testimonials grid. */
