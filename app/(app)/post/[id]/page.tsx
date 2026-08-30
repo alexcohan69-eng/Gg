@@ -35,7 +35,7 @@ export async function generateMetadata({
     plainContent.length > 60 ? `${plainContent.slice(0, 60)}...` : plainContent
 
   return {
-    title: `${post.authorName} on Pulse: "${excerpt}"`,
+    title: `${post.authorName} on Web Banai: "${excerpt}"`,
   }
 }
 

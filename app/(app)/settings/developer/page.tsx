@@ -24,7 +24,7 @@ export default async function DeveloperSettingsPage() {
     <div className="flex flex-col">
       <PageHeader
         title="Developer"
-        description="API keys for building your own tools on Pulse"
+        description="API keys for building your own tools on Web Banai"
         leading={<BackButton />}
       />
 

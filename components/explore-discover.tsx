@@ -54,7 +54,7 @@ export async function ExploreDiscover({ currentUserId }: { currentUserId: string
             <EmptyTitle>Nothing to discover yet</EmptyTitle>
             <EmptyDescription>
               Trending posts and account suggestions will show up here once
-              there&apos;s more activity on Pulse. Try searching by name,
+              there&apos;s more activity on Web Banai. Try searching by name,
               username, or keyword in the meantime.
             </EmptyDescription>
           </EmptyHeader>

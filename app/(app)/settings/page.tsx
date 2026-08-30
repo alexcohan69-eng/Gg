@@ -139,7 +139,7 @@ export default async function SettingsPage() {
           <CardHeader>
             <CardTitle>Developer</CardTitle>
             <CardDescription>
-              Generate API keys to build your own tools on Pulse.
+              Generate API keys to build your own tools on Web Banai.
             </CardDescription>
           </CardHeader>
           <CardContent>

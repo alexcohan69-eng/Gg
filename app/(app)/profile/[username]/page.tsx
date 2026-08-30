@@ -97,8 +97,14 @@ export default async function PublicProfilePage({
           posts={posts}
           currentUserId={session.user.id}
           emptyIcon={MessageSquareTextIcon}
-          emptyTitle="No posts yet"
-          emptyDescription={`${profile.name} hasn't posted anything yet.`}
+          emptyTitle={isSelf ? "Show the world what you're up to" : "No posts yet"}
+          emptyDescription={
+            isSelf
+              ? "Share your first post and it'll show up here and in the home feed."
+              : `${profile.name} hasn't posted anything yet.`
+          }
+          isSelf={isSelf}
+          composerUser={{ name: session.user.name, image: session.user.image }}
         />
       </div>
     </div>
