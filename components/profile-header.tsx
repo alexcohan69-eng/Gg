@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { CalendarIcon, LinkIcon, MapPinIcon } from "lucide-react"
+import { CalendarIcon, LinkIcon, MapPinIcon, StarIcon } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { FollowButton } from "@/components/follow-button"
@@ -22,8 +22,8 @@ export function ProfileHeader({
   website,
   location,
   joined,
-  followerCount,
-  followingCount,
+  rating,
+  totalProjects,
   profileIdentifier,
   isSelf,
   targetUserId,
@@ -40,8 +40,10 @@ export function ProfileHeader({
   website: string | null
   location: string | null
   joined: string
-  followerCount: number
-  followingCount: number
+  /** Average across rated testimonials, 1 decimal. Null if none are rated yet. */
+  rating: number | null
+  /** Curated career total shown in the About tab's highlights. Null if not set. */
+  totalProjects: number | null
   /** The username or id used in this profile's URL segment. */
   profileIdentifier: string
   isSelf: boolean
@@ -174,23 +176,26 @@ export function ProfileHeader({
 
         <div className="mt-4 flex gap-5 text-sm">
           <Link
-            href={`/profile/${profileIdentifier}/following`}
-            className="hover:underline"
+            href={`/profile/${profileIdentifier}/testimonials`}
+            className="inline-flex items-center gap-1 hover:underline"
           >
+            {rating != null ? (
+              <StarIcon className="size-3.5 fill-primary text-primary" aria-hidden="true" />
+            ) : null}
             <strong className="font-semibold text-foreground">
-              {followingCount}
+              {rating != null ? rating.toFixed(1) : "New"}
             </strong>{" "}
-            <span className="text-muted-foreground">Following</span>
+            <span className="text-muted-foreground">Rating</span>
           </Link>
           <Link
-            href={`/profile/${profileIdentifier}/followers`}
+            href={`/profile/${profileIdentifier}/work`}
             className="hover:underline"
           >
             <strong className="font-semibold text-foreground">
-              {followerCount}
+              {totalProjects ?? 0}
             </strong>{" "}
             <span className="text-muted-foreground">
-              {pluralize(followerCount, "Follower")}
+              {pluralize(totalProjects ?? 0, "Project")}
             </span>
           </Link>
         </div>

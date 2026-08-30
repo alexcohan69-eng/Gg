@@ -101,7 +101,7 @@ export function SearchExperience({
           <Input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search Pulse"
+            placeholder="Search Web Banai"
             className="h-10 pl-9"
             aria-label="Search people and posts"
             autoComplete="off"
@@ -120,7 +120,7 @@ export function SearchExperience({
                 <EmptyTitle>Find people and posts</EmptyTitle>
                 <EmptyDescription>
                   Search by name, username, or post content to discover
-                  accounts and conversations on Pulse.
+                  accounts and conversations on Web Banai.
                 </EmptyDescription>
               </EmptyHeader>
             </Empty>

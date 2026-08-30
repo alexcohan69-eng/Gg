@@ -2,10 +2,11 @@ import type { Metadata } from "next"
 import { headers } from "next/headers"
 import { notFound, redirect } from "next/navigation"
 import { getSessionWithRetry } from "@/lib/auth"
-import { getTestimonials } from "@/lib/testimonials"
+import { getTestimonials, getAverageRating } from "@/lib/testimonials"
 import { getServiceOptions } from "@/lib/services"
 import { getPortfolioProjectOptions } from "@/lib/portfolio"
-import { getFollowCounts, getProfileByIdentifier, isFollowing } from "@/lib/follows"
+import { getCareerProfile } from "@/lib/career"
+import { getProfileByIdentifier, isFollowing } from "@/lib/follows"
 import { getBlockState } from "@/lib/blocks"
 import { profileHref } from "@/lib/utils"
 import { ProfileStickyHeader } from "@/components/profile-sticky-header"
@@ -53,10 +54,11 @@ export default async function ProfileTestimonialsPage({
     year: "numeric",
   })
 
-  const [testimonials, followCounts, viewerIsFollowing, blockState, serviceOptions, projectOptions] =
+  const [testimonials, rating, careerProfile, viewerIsFollowing, blockState, serviceOptions, projectOptions] =
     await Promise.all([
       getTestimonials(profile.id),
-      getFollowCounts(profile.id),
+      getAverageRating(profile.id),
+      getCareerProfile(profile.id),
       isSelf ? Promise.resolve(false) : isFollowing(session.user.id, profile.id),
       isSelf
         ? Promise.resolve({ viewerBlockedTarget: false, targetBlockedViewer: false })
@@ -94,8 +96,8 @@ export default async function ProfileTestimonialsPage({
         website={profile.website}
         location={profile.location}
         joined={joined}
-        followerCount={followCounts.followers}
-        followingCount={followCounts.following}
+        rating={rating}
+        totalProjects={careerProfile.totalProjects}
         profileIdentifier={username}
         isSelf={isSelf}
         targetUserId={profile.id}

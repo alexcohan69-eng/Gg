@@ -302,7 +302,7 @@ export function AppShell({
             </SheetContent>
           </Sheet>
 
-          <Link href="/home" aria-label="Pulse home">
+          <Link href="/home" aria-label="Web Banai home">
             <Logo />
           </Link>
 

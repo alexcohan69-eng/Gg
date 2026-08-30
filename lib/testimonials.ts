@@ -51,6 +51,25 @@ export async function getTestimonial(userId: string, id: string): Promise<Testim
 }
 
 /**
+ * Average rating (1-5) across a profile's rated testimonials, rounded
+ * to one decimal — powers the "Rating" stat in the profile hero.
+ * Returns null when no testimonial has a rating yet, so callers can
+ * show a "New" placeholder instead of a misleading 0.
+ */
+export async function getAverageRating(userId: string): Promise<number | null> {
+  const rows = await db
+    .select({ rating: testimonials.rating })
+    .from(testimonials)
+    .where(eq(testimonials.userId, userId))
+
+  const rated = rows.map((row) => row.rating).filter((rating): rating is number => rating != null)
+  if (rated.length === 0) return null
+
+  const average = rated.reduce((sum, rating) => sum + rating, 0) / rated.length
+  return Math.round(average * 10) / 10
+}
+
+/**
  * Testimonials linked to a specific service listing, in manual sort
  * order — rendered as the "Client reviews" section on that service's
  * detail page.

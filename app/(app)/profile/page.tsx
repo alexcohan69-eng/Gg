@@ -3,11 +3,13 @@ import { headers } from "next/headers"
 import { redirect } from "next/navigation"
 import { getSessionWithRetry } from "@/lib/auth"
 import { getUserPosts } from "@/lib/posts"
-import { getFollowCounts } from "@/lib/follows"
+import { getAverageRating } from "@/lib/testimonials"
+import { getCareerProfile } from "@/lib/career"
 import { ProfileStickyHeader } from "@/components/profile-sticky-header"
 import { ProfileHeader } from "@/components/profile-header"
 import { ProfileTabs } from "@/components/profile-tabs"
 import { PostList } from "@/components/post-list"
+import { FirstPostEmptyState } from "@/components/first-post-empty-state"
 import { MessageSquareTextIcon } from "lucide-react"
 
 export const metadata: Metadata = {
@@ -33,9 +35,10 @@ export default async function ProfilePage() {
 
   const profileIdentifier = user.username ?? user.id
 
-  const [posts, followCounts] = await Promise.all([
+  const [posts, rating, careerProfile] = await Promise.all([
     getUserPosts(user.id, user.id),
-    getFollowCounts(user.id),
+    getAverageRating(user.id),
+    getCareerProfile(user.id),
   ])
 
   return (
@@ -54,8 +57,8 @@ export default async function ProfilePage() {
         website={user.website ?? null}
         location={user.location ?? null}
         joined={joined}
-        followerCount={followCounts.followers}
-        followingCount={followCounts.following}
+        rating={rating}
+        totalProjects={careerProfile.totalProjects}
         profileIdentifier={profileIdentifier}
         isSelf
       />
@@ -63,13 +66,17 @@ export default async function ProfilePage() {
       <ProfileTabs identifier={profileIdentifier} current="posts" />
 
       <div className="border-t border-border">
-        <PostList
-          posts={posts}
-          currentUserId={user.id}
-          emptyIcon={MessageSquareTextIcon}
-          emptyTitle="No posts yet"
-          emptyDescription="Anything you post will show up here."
-        />
+        {posts.length === 0 ? (
+          <FirstPostEmptyState user={{ name: user.name, image: user.image }} />
+        ) : (
+          <PostList
+            posts={posts}
+            currentUserId={user.id}
+            emptyIcon={MessageSquareTextIcon}
+            emptyTitle="No posts yet"
+            emptyDescription="Anything you post will show up here."
+          />
+        )}
       </div>
     </div>
   )

@@ -33,7 +33,7 @@ export function Logo({
           />
         </svg>
       </span>
-      {iconOnly ? <span className="sr-only">Pulse</span> : "Pulse"}
+      {iconOnly ? <span className="sr-only">Web Banai</span> : "Web Banai"}
     </span>
   )
 }

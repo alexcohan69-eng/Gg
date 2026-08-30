@@ -45,7 +45,7 @@ export default function GlobalError({
             Something went wrong
           </h1>
           <p style={{ fontSize: "0.875rem", color: "#a1a1aa", maxWidth: "26rem", margin: 0 }}>
-            Pulse hit an unexpected error and couldn&apos;t load. Try again, or
+            Web Banai hit an unexpected error and couldn&apos;t load. Try again, or
             reload the page.
           </p>
         </div>

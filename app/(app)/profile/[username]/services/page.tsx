@@ -3,8 +3,10 @@ import { headers } from "next/headers"
 import { notFound, redirect } from "next/navigation"
 import { getSessionWithRetry } from "@/lib/auth"
 import { getServices } from "@/lib/services"
-import { getFollowCounts, getProfileByIdentifier, isFollowing } from "@/lib/follows"
+import { getProfileByIdentifier, isFollowing } from "@/lib/follows"
 import { getBlockState } from "@/lib/blocks"
+import { getAverageRating } from "@/lib/testimonials"
+import { getCareerProfile } from "@/lib/career"
 import { profileHref } from "@/lib/utils"
 import { ProfileStickyHeader } from "@/components/profile-sticky-header"
 import { BackButton } from "@/components/back-button"
@@ -51,9 +53,10 @@ export default async function ProfileServicesPage({
     year: "numeric",
   })
 
-  const [listedServices, followCounts, viewerIsFollowing, blockState] = await Promise.all([
+  const [listedServices, rating, careerProfile, viewerIsFollowing, blockState] = await Promise.all([
     getServices(profile.id),
-    getFollowCounts(profile.id),
+    getAverageRating(profile.id),
+    getCareerProfile(profile.id),
     isSelf ? Promise.resolve(false) : isFollowing(session.user.id, profile.id),
     isSelf
       ? Promise.resolve({ viewerBlockedTarget: false, targetBlockedViewer: false })
@@ -78,8 +81,8 @@ export default async function ProfileServicesPage({
         website={profile.website}
         location={profile.location}
         joined={joined}
-        followerCount={followCounts.followers}
-        followingCount={followCounts.following}
+        rating={rating}
+        totalProjects={careerProfile.totalProjects}
         profileIdentifier={username}
         isSelf={isSelf}
         targetUserId={profile.id}

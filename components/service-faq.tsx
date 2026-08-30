@@ -28,7 +28,7 @@ function buildFaqs(deliveryDays: number, fastestDeliveryDays: number, hasPackage
     {
       question: "How do we communicate during the project?",
       answer:
-        "Everything happens through Pulse Messages — you'll get updates as work progresses and can share feedback or files at any point.",
+        "Everything happens through Web Banai Messages — you'll get updates as work progresses and can share feedback or files at any point.",
     },
     {
       question: "What if I'm not satisfied with the result?",

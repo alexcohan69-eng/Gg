@@ -86,7 +86,7 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
           </h1>
           <p className="text-sm text-muted-foreground">
             {isSignUp
-              ? "Join Pulse and start the conversation."
+              ? "Join Web Banai and start the conversation."
               : "Sign in to continue to your feed."}
           </p>
         </div>

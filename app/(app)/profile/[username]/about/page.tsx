@@ -13,11 +13,13 @@ import {
 import { getSessionWithRetry } from "@/lib/auth"
 import { getCareerProfile, getWorkExperience } from "@/lib/career"
 import { getProfileByIdentifier, isFollowing } from "@/lib/follows"
+import { getBlockState } from "@/lib/blocks"
+import { getAverageRating } from "@/lib/testimonials"
 import { profileHref } from "@/lib/utils"
-import { PageHeader } from "@/components/page-header"
+import { ProfileStickyHeader } from "@/components/profile-sticky-header"
 import { BackButton } from "@/components/back-button"
+import { ProfileHeader } from "@/components/profile-header"
 import { ProfileTabs } from "@/components/profile-tabs"
-import { ProfileAboutHero } from "@/components/profile-about-hero"
 import { ProfileAboutBio } from "@/components/profile-about-bio"
 import {
   ProfileAboutCareerHighlights,
@@ -67,10 +69,14 @@ export default async function ProfileAboutPage({
 
   const isSelf = profile.id === session.user.id
 
-  const [viewerFollows, careerProfile, workExperience] = await Promise.all([
+  const [viewerFollows, careerProfile, workExperience, rating, blockState] = await Promise.all([
     isSelf ? Promise.resolve(false) : isFollowing(session.user.id, profile.id),
     getCareerProfile(profile.id),
     getWorkExperience(profile.id),
+    getAverageRating(profile.id),
+    isSelf
+      ? Promise.resolve({ viewerBlockedTarget: false, targetBlockedViewer: false })
+      : getBlockState(session.user.id, profile.id),
   ])
 
   const careerHighlights: CareerHighlight[] = []
@@ -134,22 +140,35 @@ export default async function ProfileAboutPage({
 
   return (
     <div className="flex flex-col">
-      <PageHeader
-        title={profile.name}
-        description="About this account"
+      <ProfileStickyHeader
+        name={profile.name}
+        username={profile.username ?? "user"}
         leading={<BackButton />}
+      />
+
+      <ProfileHeader
+        name={profile.name}
+        username={profile.username}
+        bio={profile.bio}
+        image={profile.image}
+        bannerImage={profile.bannerImage}
+        website={profile.website}
+        location={profile.location}
+        joined={memberSince}
+        rating={rating}
+        totalProjects={careerProfile.totalProjects}
+        profileIdentifier={profile.username ?? profile.id}
+        isSelf={isSelf}
+        targetUserId={profile.id}
+        targetUserName={profile.name}
+        isFollowing={viewerFollows}
+        viewerBlockedTarget={blockState.viewerBlockedTarget}
+        targetBlockedViewer={blockState.targetBlockedViewer}
       />
 
       <ProfileTabs identifier={profile.username ?? profile.id} current="about" />
 
       <div className="flex flex-col gap-5 p-4">
-        <ProfileAboutHero
-          profile={profile}
-          isSelf={isSelf}
-          viewerFollows={viewerFollows}
-          memberSince={memberSince}
-        />
-
         <ProfileAboutBio about={profile.about} isSelf={isSelf} name={profile.name} />
 
         <ProfileAboutCareerHighlights highlights={careerHighlights} isSelf={isSelf} />
