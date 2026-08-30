@@ -319,6 +319,29 @@ export const testimonials = pgTable("testimonials", {
 })
 
 /**
+ * Public developer API keys (see backendApi.md for the full plan).
+ * Each row represents one key a user generated for themselves from
+ * /settings/developer to call the public `/api/v1/...` endpoints as
+ * themselves. Only the SHA-256 hash of the raw secret is ever stored —
+ * the raw key is shown once at creation time (see lib/api-keys.ts) and
+ * is not retrievable again. `keyPreview` (last 4 chars) lets the
+ * settings UI render "pk_live_••••••••ab12" without the full secret.
+ * No FK on `userId` (Aurora DSQL has none) — every lookup scopes by
+ * userId in application code, same convention as every other table
+ * here.
+ */
+export const apiKeys = pgTable("apiKeys", {
+  id: text("id").primaryKey(),
+  userId: text("userId").notNull(),
+  name: text("name").notNull(),
+  keyHash: text("keyHash").notNull().unique(),
+  keyPreview: text("keyPreview").notNull(),
+  lastUsedAt: timestamp("lastUsedAt"),
+  revokedAt: timestamp("revokedAt"),
+  createdAt: timestamp("createdAt").notNull().defaultNow(),
+})
+
+/**
  * Moderation reports for the report-post / report-user MVP. `reason`
  * is a small closed set of strings (see lib/moderation.ts) rather than
  * its own enum table. `status` + `reviewedBy`/`reviewedAt` back the

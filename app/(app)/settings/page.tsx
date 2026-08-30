@@ -1,4 +1,5 @@
 import type { Metadata } from "next"
+import Link from "next/link"
 import { headers } from "next/headers"
 import { redirect } from "next/navigation"
 import { getSessionWithRetry } from "@/lib/auth"
@@ -131,6 +132,23 @@ export default async function SettingsPage() {
           </CardHeader>
           <CardContent>
             <WorkExperienceEditor experience={workExperience} />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Developer</CardTitle>
+            <CardDescription>
+              Generate API keys to build your own tools on Pulse.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Link
+              href="/settings/developer"
+              className="text-sm font-medium text-foreground underline"
+            >
+              Manage API keys
+            </Link>
           </CardContent>
         </Card>
 
