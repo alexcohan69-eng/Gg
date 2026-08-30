@@ -252,10 +252,14 @@ function parseServiceForm(formData: FormData):
   }
 }
 
-/** Adds a new service listing to the end of the profile's Services tab. */
-export async function addService(formData: FormData): Promise<ActionResult> {
-  const userId = await getUserId()
-
+/**
+ * Adds a new service listing to the end of `userId`'s Services tab.
+ * Takes `userId` directly so both the web editor's session-authenticated
+ * `addService` below and the public `POST /api/v1/services` route
+ * (authenticated by API key) share one implementation — see
+ * `createPostForUser` in app/actions/posts.ts for the same pattern.
+ */
+export async function addServiceForUser(userId: string, formData: FormData): Promise<ActionResult> {
   const parsed = parseServiceForm(formData)
   if ("error" in parsed) return { success: false, error: parsed.error }
 
@@ -290,9 +294,17 @@ export async function addService(formData: FormData): Promise<ActionResult> {
   return { success: true }
 }
 
-/** Edits an existing service listing. */
-export async function updateService(id: string, formData: FormData): Promise<ActionResult> {
+/** Session-authenticated entry point used by the web Services editor. */
+export async function addService(formData: FormData): Promise<ActionResult> {
   const userId = await getUserId()
+  return addServiceForUser(userId, formData)
+}
+
+/**
+ * Edits an existing service listing owned by `userId`. See
+ * `addServiceForUser` above for why this takes `userId` directly.
+ */
+export async function updateServiceForUser(userId: string, id: string, formData: FormData): Promise<ActionResult> {
   await assertOwnsService(userId, id)
 
   const existingRows = await db
@@ -355,9 +367,18 @@ export async function updateService(id: string, formData: FormData): Promise<Act
   return { success: true }
 }
 
-/** Removes a service listing, along with its cover and gallery images. */
-export async function deleteService(id: string): Promise<ActionResult> {
+/** Session-authenticated entry point used by the web Services editor. */
+export async function updateService(id: string, formData: FormData): Promise<ActionResult> {
   const userId = await getUserId()
+  return updateServiceForUser(userId, id, formData)
+}
+
+/**
+ * Removes a service listing owned by `userId`, along with its cover
+ * and gallery images. See `addServiceForUser` above for why this
+ * takes `userId` directly.
+ */
+export async function deleteServiceForUser(userId: string, id: string): Promise<ActionResult> {
   await assertOwnsService(userId, id)
 
   const rows = await db
@@ -410,6 +431,12 @@ export async function deleteService(id: string): Promise<ActionResult> {
   revalidateServices()
 
   return { success: true }
+}
+
+/** Session-authenticated entry point used by the web Services editor. */
+export async function deleteService(id: string): Promise<ActionResult> {
+  const userId = await getUserId()
+  return deleteServiceForUser(userId, id)
 }
 
 /** Swaps a service listing's position with its neighbor to reorder the Services grid. */
