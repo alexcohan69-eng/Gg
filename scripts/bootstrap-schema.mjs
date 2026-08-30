@@ -308,6 +308,22 @@ const statements = [
   `create index async if not exists testimonials_serviceId_idx on "testimonials" ("serviceId")`,
   `create index async if not exists testimonials_projectId_idx on "testimonials" ("projectId")`,
 
+  // Public developer API keys (see backendApi.md). Only keyHash (a
+  // SHA-256 digest) is ever stored — the raw pk_live_... secret is
+  // shown once at creation time and never persisted.
+  `create table if not exists "apiKeys" (
+    id text primary key,
+    "userId" text not null,
+    name text not null,
+    "keyHash" text not null,
+    "keyPreview" text not null,
+    "lastUsedAt" timestamp,
+    "revokedAt" timestamp,
+    "createdAt" timestamp not null default now()
+  )`,
+  `create unique index async if not exists apiKeys_keyHash_uidx on "apiKeys" ("keyHash")`,
+  `create index async if not exists apiKeys_userId_idx on "apiKeys" ("userId")`,
+
   // Moderation MVP: blocks + reports
   `create table if not exists "blocks" (
     id text primary key,

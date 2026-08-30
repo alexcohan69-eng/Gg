@@ -118,9 +118,14 @@ async function assertNotBlockedByPostAuthor(userId: string, postId: string) {
   }
 }
 
-export async function likePost(postId: string): Promise<InteractionResult> {
+// Every `*ForUser` function below takes `userId` directly instead of
+// resolving it from the request itself, so both the web app's
+// session-authenticated action (the thin wrapper right after it) and
+// the public `/api/v1/...` routes (authenticated by API key) share one
+// implementation — the only difference is how `userId` was determined.
+
+export async function likePostForUser(userId: string, postId: string): Promise<InteractionResult> {
   try {
-    const userId = await getUserId()
     await assertNotBlockedByPostAuthor(userId, postId)
     const inserted = await addInteraction(likes, "likeCount", userId, postId)
     if (inserted) await notifyPostAction(postId, userId, "like")
@@ -134,9 +139,13 @@ export async function likePost(postId: string): Promise<InteractionResult> {
   }
 }
 
-export async function unlikePost(postId: string): Promise<InteractionResult> {
+export async function likePost(postId: string): Promise<InteractionResult> {
+  const userId = await getUserId()
+  return likePostForUser(userId, postId)
+}
+
+export async function unlikePostForUser(userId: string, postId: string): Promise<InteractionResult> {
   try {
-    const userId = await getUserId()
     await removeInteraction(likes, "likeCount", userId, postId)
     return { success: true }
   } catch (error) {
@@ -145,9 +154,13 @@ export async function unlikePost(postId: string): Promise<InteractionResult> {
   }
 }
 
-export async function repostPost(postId: string): Promise<InteractionResult> {
+export async function unlikePost(postId: string): Promise<InteractionResult> {
+  const userId = await getUserId()
+  return unlikePostForUser(userId, postId)
+}
+
+export async function repostPostForUser(userId: string, postId: string): Promise<InteractionResult> {
   try {
-    const userId = await getUserId()
     await assertNotBlockedByPostAuthor(userId, postId)
     const inserted = await addInteraction(reposts, "repostCount", userId, postId)
     if (inserted) await notifyPostAction(postId, userId, "repost")
@@ -161,9 +174,13 @@ export async function repostPost(postId: string): Promise<InteractionResult> {
   }
 }
 
-export async function undoRepost(postId: string): Promise<InteractionResult> {
+export async function repostPost(postId: string): Promise<InteractionResult> {
+  const userId = await getUserId()
+  return repostPostForUser(userId, postId)
+}
+
+export async function undoRepostForUser(userId: string, postId: string): Promise<InteractionResult> {
   try {
-    const userId = await getUserId()
     await removeInteraction(reposts, "repostCount", userId, postId)
     return { success: true }
   } catch (error) {
@@ -172,11 +189,13 @@ export async function undoRepost(postId: string): Promise<InteractionResult> {
   }
 }
 
-export async function bookmarkPost(
-  postId: string,
-): Promise<InteractionResult> {
+export async function undoRepost(postId: string): Promise<InteractionResult> {
+  const userId = await getUserId()
+  return undoRepostForUser(userId, postId)
+}
+
+export async function bookmarkPostForUser(userId: string, postId: string): Promise<InteractionResult> {
   try {
-    const userId = await getUserId()
     await db
       .insert(bookmarks)
       .values({ id: crypto.randomUUID(), userId, postId })
@@ -188,11 +207,15 @@ export async function bookmarkPost(
   }
 }
 
-export async function removeBookmark(
+export async function bookmarkPost(
   postId: string,
 ): Promise<InteractionResult> {
+  const userId = await getUserId()
+  return bookmarkPostForUser(userId, postId)
+}
+
+export async function removeBookmarkForUser(userId: string, postId: string): Promise<InteractionResult> {
   try {
-    const userId = await getUserId()
     await db
       .delete(bookmarks)
       .where(and(eq(bookmarks.userId, userId), eq(bookmarks.postId, postId)))
@@ -201,4 +224,11 @@ export async function removeBookmark(
     logActionError("removeBookmark", error, { postId })
     return { success: false, error: "Couldn't remove bookmark." }
   }
+}
+
+export async function removeBookmark(
+  postId: string,
+): Promise<InteractionResult> {
+  const userId = await getUserId()
+  return removeBookmarkForUser(userId, postId)
 }

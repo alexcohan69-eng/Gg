@@ -140,15 +140,20 @@ async function resolvePostAttachment(userId: string, formData: FormData): Promis
 
 /**
  * Creates a top-level post, or — when `replyToId` is present in the
- * form data — a reply. Replies are ordinary `posts` rows: this is what
- * lets the same table and query shapes support arbitrarily nested
- * threads later without a schema change.
+ * form data — a reply, as `userId`. Replies are ordinary `posts` rows:
+ * this is what lets the same table and query shapes support
+ * arbitrarily nested threads later without a schema change.
+ *
+ * Takes `userId` directly (rather than resolving it from the request)
+ * so both the web composer's session-authenticated `createPost` below
+ * and the public `/api/v1/posts` route (authenticated by API key) can
+ * share this one implementation — the only difference between them is
+ * how `userId` was determined, never the validation or DB writes.
  */
-export async function createPost(
+export async function createPostForUser(
+  userId: string,
   formData: FormData,
 ): Promise<PostActionResult> {
-  const userId = await getUserId()
-
   // The composer submits rich-text HTML (bold/italic/links/lists/etc).
   // Sanitize it here — this is the real security boundary, since the
   // client-side editor only constrains the UI, not the request body.
@@ -234,9 +239,21 @@ export async function createPost(
   return { success: true }
 }
 
-export async function deletePost(postId: string): Promise<PostActionResult> {
+/** Session-authenticated entry point used by the web composer. */
+export async function createPost(
+  formData: FormData,
+): Promise<PostActionResult> {
   const userId = await getUserId()
+  return createPostForUser(userId, formData)
+}
 
+/**
+ * Deletes `postId` as `userId` — scoped by both id AND userId so a
+ * user (or a public API key acting as them) can only ever delete
+ * their own posts. See `createPostForUser` for why this takes `userId`
+ * directly instead of resolving it internally.
+ */
+export async function deletePostForUser(userId: string, postId: string): Promise<PostActionResult> {
   // Scope the delete by userId so a user can only ever delete their own
   // posts — there is no RLS on Aurora, so this check is what protects rows.
   const deleted = await db.transaction(async (tx) => {
@@ -283,4 +300,10 @@ export async function deletePost(postId: string): Promise<PostActionResult> {
   if (deleted.replyToId) revalidatePath(`/post/${deleted.replyToId}`)
 
   return { success: true }
+}
+
+/** Session-authenticated entry point used by the web app's post/thread UI. */
+export async function deletePost(postId: string): Promise<PostActionResult> {
+  const userId = await getUserId()
+  return deletePostForUser(userId, postId)
 }

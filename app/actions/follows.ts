@@ -37,13 +37,18 @@ function revalidateFollowPaths(profileIdentifier?: string) {
   }
 }
 
-export async function followUser(
+/**
+ * Takes `userId` directly instead of resolving it from the request, so
+ * both the web app's session-authenticated `followUser` below and the
+ * public `/api/v1/users/:username/follow` route (authenticated by API
+ * key) share one implementation.
+ */
+export async function followUserForUser(
+  userId: string,
   targetUserId: string,
   profileIdentifier?: string,
 ): Promise<FollowActionResult> {
   try {
-    const userId = await getUserId()
-
     if (userId === targetUserId) {
       return { success: false, error: "You can't follow yourself." }
     }
@@ -80,13 +85,21 @@ export async function followUser(
   }
 }
 
-export async function unfollowUser(
+/** Session-authenticated entry point used by the web app's follow buttons. */
+export async function followUser(
+  targetUserId: string,
+  profileIdentifier?: string,
+): Promise<FollowActionResult> {
+  const userId = await getUserId()
+  return followUserForUser(userId, targetUserId, profileIdentifier)
+}
+
+export async function unfollowUserForUser(
+  userId: string,
   targetUserId: string,
   profileIdentifier?: string,
 ): Promise<FollowActionResult> {
   try {
-    const userId = await getUserId()
-
     await db
       .delete(follows)
       .where(
@@ -99,4 +112,13 @@ export async function unfollowUser(
     logActionError("unfollowUser", error, { targetUserId })
     return { success: false, error: "Couldn't unfollow user." }
   }
+}
+
+/** Session-authenticated entry point used by the web app's follow buttons. */
+export async function unfollowUser(
+  targetUserId: string,
+  profileIdentifier?: string,
+): Promise<FollowActionResult> {
+  const userId = await getUserId()
+  return unfollowUserForUser(userId, targetUserId, profileIdentifier)
 }
