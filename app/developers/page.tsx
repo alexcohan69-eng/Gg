@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { CodeBlock } from "@/components/docs/code-block"
 import { EndpointCard } from "@/components/docs/endpoint-card"
 import { DocsNav } from "@/components/docs/docs-nav"
+import { getSiteUrl } from "@/lib/env"
 
 export const metadata: Metadata = {
   title: "Developer API",
@@ -17,13 +18,7 @@ export const metadata: Metadata = {
 // Same resolution order as lib/auth.ts / app/layout.tsx, so the docs
 // always show the domain the app is actually running on rather than a
 // hardcoded placeholder.
-const siteUrl =
-  process.env.BETTER_AUTH_URL ??
-  (process.env.VERCEL_PROJECT_PRODUCTION_URL
-    ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
-    : process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : (process.env.V0_RUNTIME_URL ?? "http://localhost:3000"))
+const siteUrl = getSiteUrl()
 
 export default function DevelopersPage() {
   return (

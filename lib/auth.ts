@@ -1,16 +1,11 @@
 import { cache } from "react"
 import { betterAuth } from "better-auth"
 import { pool } from "@/lib/db"
+import { getSiteUrl } from "@/lib/env"
 
 export const auth = betterAuth({
   database: pool,
-  baseURL:
-    process.env.BETTER_AUTH_URL ??
-    (process.env.VERCEL_PROJECT_PRODUCTION_URL
-      ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
-      : process.env.VERCEL_URL
-        ? `https://${process.env.VERCEL_URL}`
-        : process.env.V0_RUNTIME_URL),
+  baseURL: getSiteUrl(),
   emailAndPassword: {
     enabled: true,
     autoSignIn: true,
@@ -19,7 +14,7 @@ export const auth = betterAuth({
     ...(process.env.NODE_ENV === "development"
       ? [
           "http://localhost:3000",
-          ...(process.env.V0_RUNTIME_URL ? [process.env.V0_RUNTIME_URL] : []),
+          getSiteUrl(),
           "https://*.vusercontent.net",
           "https://*.vercel.run",
           "https://*.v0.build",
