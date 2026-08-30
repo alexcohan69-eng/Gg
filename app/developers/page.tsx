@@ -10,7 +10,7 @@ import { DocsNav } from "@/components/docs/docs-nav"
 
 export const metadata: Metadata = {
   title: "Developer API",
-  description: "Build your own tools and apps on top of Pulse's public REST API.",
+  description: "Build your own tools and apps on top of Web Banai's public REST API.",
   robots: { index: true, follow: true },
 }
 
@@ -29,7 +29,7 @@ export default function DevelopersPage() {
   return (
     <main className="min-h-svh bg-background">
       <header className="mx-auto flex w-full max-w-4xl items-center justify-between px-6 py-6">
-        <Link href="/" aria-label="Pulse home">
+        <Link href="/" aria-label="Web Banai home">
           <Logo />
         </Link>
         <Button variant="outline" nativeButton={false} render={<Link href="/settings/developer" />}>
@@ -41,11 +41,11 @@ export default function DevelopersPage() {
       <div className="mx-auto w-full max-w-4xl px-6 pb-24">
         <section className="flex flex-col gap-3 py-8 sm:py-12">
           <h1 className="font-heading text-3xl font-semibold tracking-tight text-balance text-foreground sm:text-4xl">
-            Pulse API
+            Web Banai API
           </h1>
           <p className="max-w-2xl text-base leading-relaxed text-pretty text-muted-foreground">
             A public, versioned REST API for building your own tools on top of
-            Pulse — read public content freely, and act as yourself wherever
+            Web Banai — read public content freely, and act as yourself wherever
             you bring your own API key.
           </p>
         </section>
@@ -134,7 +134,7 @@ export default function DevelopersPage() {
         <div className="mx-auto flex w-full max-w-4xl flex-col items-center justify-between gap-4 sm:flex-row">
           <Logo className="text-base" />
           <p className="text-sm text-muted-foreground">
-            &copy; {new Date().getFullYear()} Pulse. All rights reserved.
+            &copy; {new Date().getFullYear()} Web Banai. All rights reserved.
           </p>
         </div>
       </footer>

@@ -8,7 +8,7 @@ import { getSessionWithRetry } from "@/lib/auth"
 import { Button } from "@/components/ui/button"
 import { Logo } from "@/components/logo"
 
-// The one page on Pulse that's actually meant to be found via search —
+// The one page on Web Banai that's actually meant to be found via search —
 // everything past sign-in is a private feed. Opts back in to indexing
 // against the root layout's default `robots: { index: false }`.
 export const metadata: Metadata = {
@@ -78,10 +78,10 @@ export default async function LandingPage() {
 
         <div className="mx-auto flex w-full max-w-6xl flex-col items-center px-6 py-24 text-center sm:py-32">
           <h1 className="max-w-3xl font-heading text-4xl font-semibold tracking-tight text-balance text-foreground sm:text-6xl">
-            Say it. Share it. Feel the pulse.
+            Say it. Share it. Feel the moment.
           </h1>
           <p className="mt-6 max-w-xl text-lg text-pretty text-muted-foreground">
-            Pulse is a fast, focused social feed for real-time thoughts,
+            Web Banai is a fast, focused social feed for real-time thoughts,
             threads, and the conversations that matter to you.
           </p>
           <div className="mt-10 flex flex-col gap-3 sm:flex-row">
@@ -131,7 +131,7 @@ export default async function LandingPage() {
         <div className="mx-auto flex w-full max-w-6xl flex-col items-center justify-between gap-4 sm:flex-row">
           <Logo className="text-base" />
           <p className="text-sm text-muted-foreground">
-            &copy; {new Date().getFullYear()} Pulse. All rights reserved.
+            &copy; {new Date().getFullYear()} Web Banai. All rights reserved.
           </p>
         </div>
       </footer>
