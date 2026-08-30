@@ -26,22 +26,22 @@ const siteUrl =
       ? `https://${process.env.VERCEL_URL}`
       : process.env.V0_RUNTIME_URL ?? "http://localhost:3000")
 
-const title = "Pulse — Say it. Share it."
+const title = "Web Banai — Say it. Share it."
 const description =
-  "Pulse is a fast, focused social feed for real-time thoughts, threads, and conversations."
+  "Web Banai is a fast, focused social feed for real-time thoughts, threads, and conversations."
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
     default: title,
-    template: "%s · Pulse",
+    template: "%s · Web Banai",
   },
   description,
   generator: "v0.app",
   openGraph: {
     title,
     description,
-    siteName: "Pulse",
+    siteName: "Web Banai",
     type: "website",
   },
   twitter: {
