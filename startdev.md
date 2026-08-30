@@ -5,6 +5,7 @@ This is a Next.js 16 (App Router) social app called **Pulse**, using:
 - **Database**: Amazon **Aurora DSQL** (NOT Aurora PostgreSQL — see warning below) via `pg` + Drizzle ORM, authenticated with short-lived IAM tokens (no static DB password).
 - **Auth**: Better Auth (email + password).
 - **File storage**: Vercel Blob (private) for avatars, banners, and post media.
+- **Telegram bot integration**: a built-in shared bot (`@WebBanaiWaterMarkBot`) plus a "bring your own bot" option, letting users manage their account from Telegram. See `usertgbot.md` for the full feature plan and current phase-by-phase status.
 - **Package manager**: pnpm (see `pnpm-lock.yaml`).
 
 Follow these steps in order. Skipping the schema step or using the wrong signer package is the most common cause of "it compiles but nothing works" errors.
@@ -41,8 +42,12 @@ Copy `.env.development.local` from the existing Vercel project/team (via `vercel
 | `AWS_ROLE_ARN` | IAM role assumed via Vercel OIDC to sign DB auth tokens |
 | `AWS_RESOURCE_ARN` | ARN of the DSQL cluster |
 | `AWS_ACCOUNT_ID` | AWS account id |
-| `BETTER_AUTH_SECRET` | Random 32+ char secret for session signing — generate with `openssl rand -base64 32` if missing |
+| `BETTER_AUTH_SECRET` | Random 32+ char secret for session signing — generate with `openssl rand -base64 32` if missing. **Not provided by any integration** — prompt the user for it via `SystemAction` (`requestEnvironmentVariables`) the first time it's missing; do not ask them to add it again once set. |
 | `BLOB_READ_WRITE_TOKEN` | Vercel Blob read/write token |
+| `TELEGRAM_BOT_TOKEN` | Built-in bot's token from `@BotFather` (e.g. `123456789:AA...`). **Not provided by any integration** — see "Telegram bot setup" below. |
+| `TELEGRAM_BOT_USERNAME` | Built-in bot's username, **bare, no leading `@`** (e.g. `WebBanaiWaterMarkBot`, not `@WebBanaiWaterMarkBot`). Used to build the `t.me/<username>?start=<id>` deep link in `/settings/telegram`. |
+| `TELEGRAM_WEBHOOK_SECRET` | Random 32+ byte secret (hex/base64, must NOT contain `:`) checked against Telegram's `X-Telegram-Bot-Api-Secret-Token` header on the builtin webhook route. Generate with `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`. **Never reuse `TELEGRAM_BOT_TOKEN`'s value here** — it contains a `:` and is a different secret with a different purpose. |
+| `TELEGRAM_TOKEN_ENCRYPTION_KEY` | Random 32+ byte key (hex/base64) used to AES-256-GCM encrypt BYO bot tokens at rest (`lib/telegram/crypto.ts`). Generate the same way as `TELEGRAM_WEBHOOK_SECRET`, as a **separate** random value — do not reuse it or the bot token. |
 | `AI_GATEWAY_API_KEY` | Only needed if AI features are added later |
 
 There is **no static database password**. Auth to the DB works by exchanging Vercel's OIDC token for temporary AWS credentials (`AWS_ROLE_ARN` + `AWS_REGION`), then using those credentials to generate a short-lived DSQL auth token. This requires the app to be running inside a Vercel-connected environment (Vercel Sandbox, Vercel deployment, or a machine with `vercel env pull`'d credentials) — plain local Postgres credentials will not work.
@@ -72,7 +77,27 @@ If you change `lib/db/schema.ts`, update `scripts/bootstrap-schema.mjs` to match
 
 `lib/db/index.ts` and `scripts/bootstrap-schema.mjs` MUST both use `DsqlSigner` from `@aws-sdk/dsql-signer`. Do **not** use `Signer` from `@aws-sdk/rds-signer` (that package is for Aurora **PostgreSQL**, a different product with a different auth mechanism). Using the wrong signer causes every DB connection to fail silently or with an opaque auth error, even though the code compiles fine. If you ever see connection/auth errors, check this first.
 
-## 5. Run the dev server
+## 5. Telegram bot setup (one-time, first run only)
+
+The four `TELEGRAM_*` env vars are **not** provided by any integration and won't exist on a fresh checkout — check for them and set them up before the Telegram feature will work end-to-end. See `usertgbot.md` for the full feature plan; this step only covers getting it running.
+
+1. **Check first**: call `GetOrRequestIntegration` with `fetchAll: true` (or check `.env.development.local`) — if all four `TELEGRAM_*` vars below already exist, skip to step 4 (just re-register the webhook, since the deployment URL may have changed).
+2. **If missing, create the bot** (requires a human with the Telegram app — cannot be done by the agent): ask the user to open Telegram, message `@BotFather`, send `/newbot`, pick a display name, and pick a `@username` ending in `bot` (must be globally unique). BotFather replies with a token like `123456789:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw`. Get that token and the final username back from the user.
+3. **Set the four env vars** via `SystemAction` (`requestEnvironmentVariables`) — never ask the user to add them again once set:
+   - `TELEGRAM_BOT_TOKEN` = the token from BotFather, verbatim.
+   - `TELEGRAM_BOT_USERNAME` = the username **without** the leading `@`.
+   - `TELEGRAM_WEBHOOK_SECRET` = generate with `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` — a fresh random value, **not** the bot token (the bot token contains `:`, which breaks Telegram's secret-token header).
+   - `TELEGRAM_TOKEN_ENCRYPTION_KEY` = generate the same way, as a **separate** random value from the webhook secret.
+4. **Register the webhook** against the app's real public URL (the production Vercel deployment, not the local dev/preview domain — Telegram must be able to reach it over the internet, and the local sandbox preview domain returns redirects instead of your app's JSON):
+   ```bash
+   curl -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/setWebhook" \
+     -H "Content-Type: application/json" \
+     -d "{\"url\":\"https://<your-production-domain>/api/telegram/webhook/builtin\",\"secret_token\":\"${TELEGRAM_WEBHOOK_SECRET}\",\"allowed_updates\":[\"message\",\"callback_query\"]}"
+   ```
+   Confirm with `curl "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getWebhookInfo"` — expect no `last_error_message` and `pending_update_count: 0` (or draining to 0).
+5. Redeploy to production if the env vars were just added/changed, so the live deployment actually reads the new values (`vercel env pull` locally is not enough on its own — the deployed serverless functions need to be rebuilt with the new env vars too).
+
+## 6. Run the dev server
 
 ```bash
 pnpm dev
@@ -80,11 +105,12 @@ pnpm dev
 
 The app runs on `http://localhost:3000` by default.
 
-## 6. Verify it's working
+## 7. Verify it's working
 
 - Visit `/signup` and create an account — confirms Better Auth + DB writes work.
 - Create a post from `/home` — confirms the rich text editor, post storage, and feed queries work.
 - Upload an avatar/banner or attach media to a post — confirms `BLOB_READ_WRITE_TOKEN` / Vercel Blob is configured.
+- Visit `/settings/telegram`, click to link the built-in bot, open the deep link in Telegram, send `/start`, enter the code it replies with — confirms the Telegram bot integration is fully wired (see `usertgbot.md` Phase 8 for the full manual verification checklist).
 
 ## Other useful commands
 
@@ -101,3 +127,7 @@ pnpm exec tsc --noEmit   # type-check only, no build output
 - **"column ... does not exist" errors (e.g. sign-up succeeds but redirecting to `/home` crashes)** → `lib/db/schema.ts` has a column that `scripts/bootstrap-schema.mjs` never added (see the "Known past drift" note in step 3). Add the missing `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` statement and re-run the bootstrap script — `CREATE TABLE IF NOT EXISTS` alone won't add columns to a table that already exists.
 - **Login succeeds but immediately looks logged out** → check `lib/auth.ts` cookie config (`sameSite`/`secure`) matches your environment; don't disable CSRF/origin checks to "fix" this.
 - **Env vars "missing" in a script run via Bash** → the dev server auto-loads `.env.development.local`, but ad-hoc Node scripts don't. Use `node --env-file-if-exists=.env.development.local your-script.mjs`.
+- **Telegram `/start` sent but bot never replies** → almost always the webhook is registered against the wrong URL (e.g. the local sandbox preview domain instead of the real production deployment — Telegram can't reach a local-only preview). Run `getWebhookInfo` and check the `url` field; re-run `setWebhook` against the production domain if it's wrong.
+- **Deep link (`t.me/<username>?start=<id>`) 404s or points at the wrong bot** → `TELEGRAM_BOT_USERNAME` almost certainly has a leading `@` in it. The code builds the link as `t.me/${TELEGRAM_BOT_USERNAME}?...`, so the env var must be the bare username only.
+- **Telegram webhook secret check always fails / bot token silently used as a webhook secret** → don't ever set `TELEGRAM_WEBHOOK_SECRET` or `TELEGRAM_TOKEN_ENCRYPTION_KEY` to the same value as `TELEGRAM_BOT_TOKEN`. They're separate secrets with separate purposes; the bot token also contains a `:` which some secret-token validators reject.
+- **`new URL(...)` throws inside `app/layout.tsx`, `lib/auth.ts`, or `lib/telegram/links.ts`** → this preview environment's `V0_RUNTIME_URL` can arrive with stray wrapping quote characters baked into the value. All three call sites (plus `app/developers/page.tsx` and `lib/telegram/commands.ts`) go through `getSiteUrl()` in `lib/env.ts`, which strips wrapping quotes and validates the result — if you add a new call site that needs the app's own origin, import `getSiteUrl()` rather than re-deriving it.
