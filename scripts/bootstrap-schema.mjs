@@ -350,6 +350,27 @@ const statements = [
   `create unique index async if not exists reports_reporter_target_uidx on "reports" ("reporterId", "targetType", "targetId")`,
   // Backs the admin review queue's "open reports first" listing.
   `create index async if not exists reports_status_createdAt_idx on "reports" ("status", "createdAt")`,
+
+  // Telegram bot integration (see usertgbot.md). One row per user's
+  // link to either the shared built-in bot or their own BYO bot.
+  `create table if not exists "telegramLinks" (
+    id text primary key,
+    "userId" text not null,
+    kind text not null,
+    "chatId" text,
+    "botTokenEncrypted" text,
+    "botUsername" text,
+    "webhookSecret" text,
+    "verificationCode" text,
+    "verificationExpiresAt" timestamp,
+    "verifiedAt" timestamp,
+    "activeConversationId" text,
+    "createdAt" timestamp not null default now(),
+    "updatedAt" timestamp not null default now()
+  )`,
+  `create unique index async if not exists telegramLinks_userId_uidx on "telegramLinks" ("userId")`,
+  `create index async if not exists telegramLinks_chatId_idx on "telegramLinks" ("chatId")`,
+  `create unique index async if not exists telegramLinks_webhookSecret_uidx on "telegramLinks" ("webhookSecret")`,
 ]
 
 const client = await pool.connect()
