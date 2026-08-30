@@ -1,4 +1,5 @@
 import { requireApiUser, apiError, apiSuccess, withApiErrorHandling } from "@/lib/api-auth"
+import { parseFormData } from "@/lib/api-v1-helpers"
 import { getFollowCounts, getProfileByIdentifier } from "@/lib/follows"
 import { updateProfileForUser } from "@/app/actions/profile"
 
@@ -35,7 +36,7 @@ export async function GET(request: Request) {
 export async function PATCH(request: Request) {
   return withApiErrorHandling(async () => {
     const userId = await requireApiUser(request)
-    const formData = await request.formData()
+    const formData = await parseFormData(request)
     const result = await updateProfileForUser(userId, formData)
     if (!result.success) {
       return apiError(400, "invalid_profile", result.error ?? "Couldn't update profile.")

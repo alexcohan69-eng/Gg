@@ -1,5 +1,5 @@
 import { authenticateApiRequest, apiError, apiSuccess, requireApiUser, withApiErrorHandling } from "@/lib/api-auth"
-import { parseLimit } from "@/lib/api-v1-helpers"
+import { parseFormData, parseLimit } from "@/lib/api-v1-helpers"
 import { getFeedPosts } from "@/lib/posts"
 import { createPostForUser, type PostActionResult } from "@/app/actions/posts"
 
@@ -27,7 +27,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   return withApiErrorHandling(async () => {
     const userId = await requireApiUser(request)
-    const formData = await request.formData()
+    const formData = await parseFormData(request)
     const result: PostActionResult = await createPostForUser(userId, formData)
     if (!result.success) {
       return apiError(400, "invalid_post", result.error ?? "Couldn't create post.")

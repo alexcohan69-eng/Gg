@@ -1,4 +1,5 @@
 import { requireApiUser, apiError, apiSuccess, withApiErrorHandling } from "@/lib/api-auth"
+import { parseFormData } from "@/lib/api-v1-helpers"
 import { getPortfolioProject } from "@/lib/portfolio"
 import { updatePortfolioProjectForUser, deletePortfolioProjectForUser } from "@/app/actions/portfolio"
 
@@ -35,7 +36,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   return withApiErrorHandling(async () => {
     const userId = await requireApiUser(request)
     const { id } = await params
-    const formData = await request.formData()
+    const formData = await parseFormData(request)
     try {
       const result = await updatePortfolioProjectForUser(userId, id, formData)
       if (!result.success) {
