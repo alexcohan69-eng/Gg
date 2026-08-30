@@ -3,14 +3,17 @@ import { headers } from "next/headers"
 import { notFound, redirect } from "next/navigation"
 import { getSessionWithRetry } from "@/lib/auth"
 import { getUserPosts } from "@/lib/posts"
-import { getFollowCounts, getProfileByIdentifier, isFollowing } from "@/lib/follows"
+import { getProfileByIdentifier, isFollowing } from "@/lib/follows"
 import { getBlockState } from "@/lib/blocks"
+import { getAverageRating } from "@/lib/testimonials"
+import { getCareerProfile } from "@/lib/career"
 import { profileHref } from "@/lib/utils"
 import { ProfileStickyHeader } from "@/components/profile-sticky-header"
 import { BackButton } from "@/components/back-button"
 import { ProfileHeader } from "@/components/profile-header"
 import { ProfileTabs } from "@/components/profile-tabs"
 import { PostList } from "@/components/post-list"
+import { FirstPostEmptyState } from "@/components/first-post-empty-state"
 import { MessageSquareTextIcon } from "lucide-react"
 
 export async function generateMetadata({
@@ -53,9 +56,10 @@ export default async function PublicProfilePage({
     year: "numeric",
   })
 
-  const [posts, followCounts, viewerIsFollowing, blockState] = await Promise.all([
+  const [posts, rating, careerProfile, viewerIsFollowing, blockState] = await Promise.all([
     getUserPosts(profile.id, session.user.id),
-    getFollowCounts(profile.id),
+    getAverageRating(profile.id),
+    getCareerProfile(profile.id),
     isSelf ? Promise.resolve(false) : isFollowing(session.user.id, profile.id),
     isSelf
       ? Promise.resolve({ viewerBlockedTarget: false, targetBlockedViewer: false })
@@ -79,8 +83,8 @@ export default async function PublicProfilePage({
         website={profile.website}
         location={profile.location}
         joined={joined}
-        followerCount={followCounts.followers}
-        followingCount={followCounts.following}
+        rating={rating}
+        totalProjects={careerProfile.totalProjects}
         profileIdentifier={username}
         isSelf={isSelf}
         targetUserId={profile.id}
@@ -93,13 +97,17 @@ export default async function PublicProfilePage({
       <ProfileTabs identifier={username} current="posts" />
 
       <div className="border-t border-border">
-        <PostList
-          posts={posts}
-          currentUserId={session.user.id}
-          emptyIcon={MessageSquareTextIcon}
-          emptyTitle="No posts yet"
-          emptyDescription={`${profile.name} hasn't posted anything yet.`}
-        />
+        {isSelf && posts.length === 0 ? (
+          <FirstPostEmptyState user={{ name: profile.name, image: profile.image }} />
+        ) : (
+          <PostList
+            posts={posts}
+            currentUserId={session.user.id}
+            emptyIcon={MessageSquareTextIcon}
+            emptyTitle="No posts yet"
+            emptyDescription={`${profile.name} hasn't posted anything yet.`}
+          />
+        )}
       </div>
     </div>
   )

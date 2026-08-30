@@ -243,7 +243,7 @@ export function ApiKeyManager({ initialKeys }: { initialKeys: ApiKeySummary[] })
             </EmptyMedia>
             <EmptyTitle>No API keys yet</EmptyTitle>
             <EmptyDescription>
-              Create a key to start building your own tools against the Pulse API.
+              Create a key to start building your own tools against the Web Banai API.
             </EmptyDescription>
           </EmptyHeader>
         </Empty>
