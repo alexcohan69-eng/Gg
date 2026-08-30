@@ -4,6 +4,7 @@ import { Geist, Space_Grotesk } from "next/font/google"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { Toaster } from "@/components/ui/sonner"
 import { ThemeProvider } from "@/components/theme-provider"
+import { getSiteUrl } from "@/lib/env"
 import "./globals.css"
 
 const geist = Geist({
@@ -18,13 +19,7 @@ const spaceGrotesk = Space_Grotesk({
   display: "swap",
 })
 
-const siteUrl =
-  process.env.BETTER_AUTH_URL ??
-  (process.env.VERCEL_PROJECT_PRODUCTION_URL
-    ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
-    : process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : process.env.V0_RUNTIME_URL ?? "http://localhost:3000")
+const siteUrl = getSiteUrl()
 
 const title = "Web Banai — Say it. Share it."
 const description =

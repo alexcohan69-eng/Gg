@@ -45,3 +45,38 @@ export function assertRequiredEnv() {
   }
   validated = true
 }
+
+/**
+ * Some preview environments inject V0_RUNTIME_URL with stray quote
+ * characters baked into the value (e.g. `"'https://foo.v0.build'"`),
+ * which throws when passed straight into `new URL(...)`. Strip any
+ * wrapping quotes and validate before trusting the value.
+ */
+function sanitizeUrl(value: string | undefined): string | undefined {
+  if (!value) return undefined
+  const unquoted = value.trim().replace(/^['"]+|['"]+$/g, "")
+  try {
+    // eslint-disable-next-line no-new
+    new URL(unquoted)
+    return unquoted
+  } catch {
+    return undefined
+  }
+}
+
+/**
+ * Single source of truth for "what origin is this app running at",
+ * used by lib/auth.ts (Better Auth baseURL), app/layout.tsx
+ * (metadataBase), and lib/telegram/links.ts (webhook registration)
+ * so all three always agree on the same domain.
+ */
+export function getSiteUrl(): string {
+  return (
+    sanitizeUrl(process.env.BETTER_AUTH_URL) ??
+    (process.env.VERCEL_PROJECT_PRODUCTION_URL
+      ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+      : process.env.VERCEL_URL
+        ? `https://${process.env.VERCEL_URL}`
+        : (sanitizeUrl(process.env.V0_RUNTIME_URL) ?? "http://localhost:3000"))
+  )
+}

@@ -17,6 +17,7 @@ import {
   setWebhook,
 } from "@/lib/telegram/client"
 import { logActionError } from "@/lib/log-action-error"
+import { getSiteUrl } from "@/lib/env"
 
 /**
  * Link lifecycle for both bot kinds (see usertgbot.md). Every command
@@ -29,19 +30,7 @@ const VERIFICATION_CODE_TTL_MS = 10 * 60 * 1000
 
 export type TelegramLink = typeof telegramLinks.$inferSelect
 
-// Same resolution order as app/developers/page.tsx / lib/auth.ts, so
-// the webhook URL registered with Telegram always points at the
-// domain the app is actually running on.
-export function getSiteUrl(): string {
-  return (
-    process.env.BETTER_AUTH_URL ??
-    (process.env.VERCEL_PROJECT_PRODUCTION_URL
-      ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
-      : process.env.VERCEL_URL
-        ? `https://${process.env.VERCEL_URL}`
-        : (process.env.V0_RUNTIME_URL ?? "http://localhost:3000"))
-  )
-}
+export { getSiteUrl }
 
 export async function getLinkForUser(userId: string): Promise<TelegramLink | null> {
   const rows = await db.select().from(telegramLinks).where(eq(telegramLinks.userId, userId)).limit(1)
