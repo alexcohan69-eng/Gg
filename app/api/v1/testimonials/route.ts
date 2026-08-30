@@ -1,4 +1,5 @@
 import { requireApiUser, apiError, apiSuccess, withApiErrorHandling } from "@/lib/api-auth"
+import { parseFormData } from "@/lib/api-v1-helpers"
 import { getTestimonials } from "@/lib/testimonials"
 import { addTestimonialForUser } from "@/app/actions/testimonials"
 
@@ -24,7 +25,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   return withApiErrorHandling(async () => {
     const userId = await requireApiUser(request)
-    const formData = await request.formData()
+    const formData = await parseFormData(request)
     const result = await addTestimonialForUser(userId, formData)
     if (!result.success) {
       return apiError(400, "invalid_testimonial", result.error ?? "Couldn't create testimonial.")
