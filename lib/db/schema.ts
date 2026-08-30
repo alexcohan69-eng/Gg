@@ -342,6 +342,53 @@ export const apiKeys = pgTable("apiKeys", {
 })
 
 /**
+ * Telegram bot integration (see usertgbot.md for the full plan). Each
+ * row is one user's link to either the site's shared built-in bot
+ * (`kind: "builtin"`) or their own BYO bot (`kind: "custom"`) — at
+ * most one row per `userId`. No FK on `userId` (Aurora DSQL has none),
+ * same convention as every other table here.
+ */
+export const telegramLinks = pgTable("telegramLinks", {
+  id: text("id").primaryKey(),
+  userId: text("userId").notNull().unique(),
+  // "builtin" | "custom" — which bot serves this link.
+  kind: text("kind").notNull(),
+  // The Telegram chat to message. Null until the user has actually
+  // sent /start (builtin) or the confirmation code has been issued
+  // (custom) — we don't know their chat id before that.
+  chatId: text("chatId"),
+  // AES-256-GCM ciphertext of the user's own bot token, encrypted with
+  // TELEGRAM_TOKEN_ENCRYPTION_KEY (see lib/telegram/crypto.ts). Null
+  // for "builtin" links, which use the shared TELEGRAM_BOT_TOKEN env
+  // var instead. Never stored or logged in plaintext.
+  botTokenEncrypted: text("botTokenEncrypted"),
+  // Cosmetic only (e.g. "MyOwnBot"), shown in the settings UI. Null
+  // for "builtin".
+  botUsername: text("botUsername"),
+  // Random per-link secret used both as this bot's webhook URL segment
+  // (/api/telegram/webhook/custom/[webhookSecret]) AND as Telegram's
+  // `secret_token` on setWebhook, so an inbound request is only
+  // trusted if both the URL segment and the header match this row.
+  // Null for "builtin", which uses one fixed route + the shared
+  // TELEGRAM_WEBHOOK_SECRET env var instead of a per-row secret.
+  webhookSecret: text("webhookSecret").unique(),
+  // 6-digit one-time code + expiry for the ownership-verification
+  // step. Cleared once verifiedAt is set.
+  verificationCode: text("verificationCode"),
+  verificationExpiresAt: timestamp("verificationExpiresAt"),
+  // Null until the confirmation code has been entered back on the
+  // site. Every bot command is refused for a link with no verifiedAt.
+  verifiedAt: timestamp("verifiedAt"),
+  // Tracks which conversation a plain-text (non-command) message from
+  // this chat should be sent into, so a user can just type a reply
+  // after getting a DM notification instead of needing a /reply
+  // command every time.
+  activeConversationId: text("activeConversationId"),
+  createdAt: timestamp("createdAt").notNull().defaultNow(),
+  updatedAt: timestamp("updatedAt").notNull().defaultNow(),
+})
+
+/**
  * Moderation reports for the report-post / report-user MVP. `reason`
  * is a small closed set of strings (see lib/moderation.ts) rather than
  * its own enum table. `status` + `reviewedBy`/`reviewedAt` back the

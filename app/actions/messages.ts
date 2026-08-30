@@ -15,6 +15,7 @@ import { searchUsers } from "@/lib/search"
 import { isBlockedEitherWay } from "@/lib/blocks"
 import type { FollowListUser } from "@/lib/follows"
 import { logActionError } from "@/lib/log-action-error"
+import { notifyNewMessage } from "@/lib/telegram/notify"
 
 const MAX_MESSAGE_LENGTH = 2000
 
@@ -29,16 +30,18 @@ export type MessageActionResult<T = undefined> =
   | { success: false; error: string }
 
 /**
- * Starts (or resumes) a 1:1 conversation with `targetUserId` and
- * returns its id so the caller can navigate to the thread. Used from
- * a profile's "Message" button and from the new-message search page.
+ * Starts (or resumes) a 1:1 conversation with `targetUserId`, acting
+ * as `viewerId`. Takes `viewerId` directly so both the web app's
+ * session-authenticated `startConversation` below and the Telegram
+ * command dispatcher (see lib/telegram/commands.ts) share one
+ * implementation — see `createPostForUser` in app/actions/posts.ts
+ * for the same pattern.
  */
-export async function startConversation(
+export async function startConversationForUser(
+  viewerId: string,
   targetUserId: string,
 ): Promise<MessageActionResult<{ conversationId: string }>> {
   try {
-    const viewerId = await getUserId()
-
     if (await isBlockedEitherWay(viewerId, targetUserId)) {
       return { success: false, error: "You can't message this account." }
     }
@@ -56,17 +59,30 @@ export async function startConversation(
 }
 
 /**
- * Sends a message in an existing conversation. Re-verifies the sender
- * is a participant (ownership lives entirely in application code —
- * there's no RLS on Aurora) before inserting anything.
+ * Starts (or resumes) a 1:1 conversation with `targetUserId` and
+ * returns its id so the caller can navigate to the thread. Used from
+ * a profile's "Message" button and from the new-message search page.
  */
-export async function sendMessage(
+export async function startConversation(
+  targetUserId: string,
+): Promise<MessageActionResult<{ conversationId: string }>> {
+  const viewerId = await getUserId()
+  return startConversationForUser(viewerId, targetUserId)
+}
+
+/**
+ * Sends a message in an existing conversation as `viewerId`.
+ * Re-verifies the sender is a participant (ownership lives entirely
+ * in application code — there's no RLS on Aurora) before inserting
+ * anything. See `startConversationForUser` above for why this takes
+ * `viewerId` directly.
+ */
+export async function sendMessageForUser(
+  viewerId: string,
   conversationId: string,
   content: string,
 ): Promise<MessageActionResult> {
   try {
-    const viewerId = await getUserId()
-
     const trimmed = content.trim()
     if (!trimmed) return { success: false, error: "Message can't be empty." }
     if (trimmed.length > MAX_MESSAGE_LENGTH) {
@@ -97,11 +113,28 @@ export async function sendMessage(
 
     revalidatePath(`/messages/${conversationId}`)
     revalidatePath("/messages")
+
+    // Push a Telegram notification to the recipient, if they have a
+    // verified link — see lib/telegram/notify.ts. Best-effort: a
+    // failure here should never fail the send itself.
+    notifyNewMessage({ conversationId, senderId: viewerId, content: trimmed }).catch((error) => {
+      logActionError("notifyNewMessage", error, { conversationId })
+    })
+
     return { success: true, data: undefined }
   } catch (error) {
     logActionError("sendMessage", error, { conversationId })
     return { success: false, error: "Couldn't send message." }
   }
+}
+
+/** Session-authenticated entry point used by the web app's message composer. */
+export async function sendMessage(
+  conversationId: string,
+  content: string,
+): Promise<MessageActionResult> {
+  const viewerId = await getUserId()
+  return sendMessageForUser(viewerId, conversationId, content)
 }
 
 /**

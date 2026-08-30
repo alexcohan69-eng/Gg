@@ -154,6 +154,23 @@ export default async function SettingsPage() {
 
         <Card>
           <CardHeader>
+            <CardTitle>Telegram</CardTitle>
+            <CardDescription>
+              Manage your account from a Telegram bot — post, message, and more.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Link
+              href="/settings/telegram"
+              className="text-sm font-medium text-foreground underline"
+            >
+              Connect Telegram
+            </Link>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
             <CardTitle>Account</CardTitle>
             <CardDescription>{user.email}</CardDescription>
           </CardHeader>
