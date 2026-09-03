@@ -1,7 +1,29 @@
 import { NextResponse } from "next/server"
 import { getLinkByChatId, completeBuiltinLink } from "@/lib/telegram/links"
 import { handleUpdate } from "@/lib/telegram/commands"
+import { getBuiltinBotToken, sendMessage } from "@/lib/telegram/client"
 import { logActionError } from "@/lib/log-action-error"
+import { getSiteUrl } from "@/lib/env"
+
+/**
+ * Sent whenever a chat writes to this bot before it's linked to a
+ * Web Banai account (no `/start <token>` deep-link payload yet, or
+ * that payload turned out invalid/expired). Previously the webhook
+ * just returned 200 with no reply in every one of these cases, which
+ * looks identical to "the bot is broken" from inside Telegram — this
+ * makes sure every unlinked chat gets pointed at Settings instead of
+ * silence.
+ */
+async function sendConnectPrompt(chatId: string, reason?: string): Promise<void> {
+  const intro = reason ? `${reason}\n\n` : ""
+  await sendMessage(
+    getBuiltinBotToken(),
+    chatId,
+    `${intro}👋 <b>This bot isn't connected to a Web Banai account yet.</b>\n\n` +
+      `Open <b>${getSiteUrl()}/settings/telegram</b>, tap "Connect Telegram", and use the link it gives you to come back here — I'll send a verification code to finish linking.`,
+    { parseMode: "HTML" },
+  )
+}
 
 /**
  * Webhook for the shared built-in bot (see usertgbot.md). Gated by a
@@ -34,8 +56,15 @@ export async function POST(request: Request) {
     if (chatId && text?.startsWith("/start")) {
       const startPayload = text.slice("/start".length).trim()
       const existingLink = await getLinkByChatId(chatId)
-      if (!existingLink && startPayload) {
-        await completeBuiltinLink(startPayload, chatId)
+      if (!existingLink) {
+        if (startPayload) {
+          const { ok } = await completeBuiltinLink(startPayload, chatId)
+          if (!ok) {
+            await sendConnectPrompt(chatId, "⚠️ That connection link is invalid or has expired.")
+          }
+        } else {
+          await sendConnectPrompt(chatId)
+        }
         return NextResponse.json({ ok: true })
       }
     }
@@ -46,8 +75,21 @@ export async function POST(request: Request) {
     if (!resolvedChatId) return NextResponse.json({ ok: true })
 
     const link = await getLinkByChatId(resolvedChatId)
-    if (!link) return NextResponse.json({ ok: true })
-    if (!link.verifiedAt) return NextResponse.json({ ok: true })
+    if (!link) {
+      if (chatId) await sendConnectPrompt(chatId)
+      return NextResponse.json({ ok: true })
+    }
+    if (!link.verifiedAt) {
+      if (chatId) {
+        await sendMessage(
+          getBuiltinBotToken(),
+          chatId,
+          `🔑 Almost there — enter the verification code I sent you into <b>Settings → Telegram</b> on the site to finish linking this chat.`,
+          { parseMode: "HTML" },
+        )
+      }
+      return NextResponse.json({ ok: true })
+    }
 
     await handleUpdate(link, update)
   } catch (error) {
