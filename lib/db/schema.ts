@@ -384,6 +384,12 @@ export const telegramLinks = pgTable("telegramLinks", {
   // after getting a DM notification instead of needing a /reply
   // command every time.
   activeConversationId: text("activeConversationId"),
+  // Set while the bot is waiting for the *next* plain-text message to
+  // use as rich-text post content (the "✍️ New Post" menu button),
+  // rather than routing it into an active DM thread. Cleared as soon
+  // as that message arrives. Currently only "post" is used, but kept
+  // as free text (like `kind`/`activeConversationId`) for future modes.
+  composeMode: text("composeMode"),
   createdAt: timestamp("createdAt").notNull().defaultNow(),
   updatedAt: timestamp("updatedAt").notNull().defaultNow(),
 })

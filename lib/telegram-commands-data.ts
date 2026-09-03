@@ -25,7 +25,8 @@ export const TELEGRAM_COMMAND_GROUPS: CommandGroup[] = [
     commands: [
       { command: "/whoami", description: "Shows which account this bot is linked to.", example: "/whoami" },
       { command: "/unlink", description: "Disconnects this bot from your account.", example: "/unlink" },
-      { command: "/help", description: "Lists every available command.", example: "/help" },
+      { command: "/help", description: "Lists every available command, with a tappable menu.", example: "/help" },
+      { command: "/cancel", description: "Exits compose mode (or an active DM reply) without sending anything.", example: "/cancel" },
     ],
   },
   {
@@ -41,11 +42,21 @@ export const TELEGRAM_COMMAND_GROUPS: CommandGroup[] = [
   {
     id: "posts",
     title: "Posts",
-    description: "Publish, read, and manage posts.",
+    description:
+      "Publish, read, and manage posts — with full rich-text formatting. Any bold, italic, underline, strikethrough, links, or code you apply with Telegram's own formatting toolbar carries over to the site exactly as typed.",
     commands: [
-      { command: "/post <text>", description: "Publishes a new top-level post.", example: "/post Shipping something new today." },
+      {
+        command: "/post <text>",
+        description: "Publishes a new top-level post. Format the text first with Telegram's toolbar for bold/italic/links/etc.",
+        example: "/post Shipping something new today.",
+      },
+      {
+        command: "✍️ New Post (menu button)",
+        description: "Arms compose mode — your next message is published as a post, formatting included. Send /cancel to back out.",
+        example: "/start → New Post → (type your post)",
+      },
       { command: "/delete <postId>", description: "Deletes one of your own posts.", example: "/delete 3f9a1c2e-..." },
-      { command: "/feed", description: "Shows the latest posts in your feed.", example: "/feed" },
+      { command: "/feed", description: "Shows the latest posts, each with tap-to-like/repost/save buttons.", example: "/feed" },
       { command: "/view <postId>", description: "Shows a post and its most recent replies.", example: "/view 3f9a1c2e-..." },
     ],
   },
