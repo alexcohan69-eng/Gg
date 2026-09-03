@@ -14,10 +14,31 @@ import {
   getMe,
   resolveOutgoingToken,
   sendMessage,
+  setMyCommands,
   setWebhook,
+  type TelegramBotCommand,
 } from "@/lib/telegram/client"
 import { logActionError } from "@/lib/log-action-error"
 import { getSiteUrl } from "@/lib/env"
+
+/**
+ * The "/" autocomplete menu Telegram clients show while typing. Kept
+ * to the handful of commands worth discovering this way — the full
+ * reference (including list/view/delete for services, portfolio,
+ * testimonials, and DMs) lives in the "📖 All Commands" menu button
+ * and the /telegram-commands page instead of crowding this list.
+ */
+const BOT_COMMANDS: TelegramBotCommand[] = [
+  { command: "start", description: "Open the main menu" },
+  { command: "post", description: "Publish a new post" },
+  { command: "feed", description: "See the latest posts" },
+  { command: "me", description: "Your profile summary" },
+  { command: "notifications", description: "Recent notifications" },
+  { command: "inbox", description: "Your conversations" },
+  { command: "search", description: "Search users and posts" },
+  { command: "help", description: "Show every command" },
+  { command: "unlink", description: "Disconnect this bot" },
+]
 
 /**
  * Link lifecycle for both bot kinds (see usertgbot.md). Every command
@@ -71,6 +92,7 @@ async function ensureBuiltinWebhookRegistered(): Promise<void> {
   if (!token || !secret) return
   try {
     await setWebhook(token, `${getSiteUrl()}/api/telegram/webhook/builtin`, secret)
+    await setMyCommands(token, BOT_COMMANDS)
     builtinWebhookRegistered = true
   } catch (error) {
     // Non-fatal: the deep link still works, and this is retried on
@@ -222,6 +244,7 @@ export async function startCustomLink(
 
   try {
     await setWebhook(trimmedToken, `${getSiteUrl()}/api/telegram/webhook/custom/${webhookSecret}`, webhookSecret)
+    await setMyCommands(trimmedToken, BOT_COMMANDS)
   } catch {
     return {
       success: false,
@@ -292,5 +315,19 @@ export async function setActiveConversation(userId: string, conversationId: stri
   await db
     .update(telegramLinks)
     .set({ activeConversationId: conversationId, updatedAt: new Date() })
+    .where(eq(telegramLinks.userId, userId))
+}
+
+/**
+ * Arms (or clears) "compose mode" — the next plain-text message from
+ * this chat is treated as new post content (with full Telegram
+ * rich-text formatting carried over) instead of a DM reply. Set by
+ * the "✍️ New Post" menu button, cleared as soon as that message is
+ * used or the user runs an explicit command instead.
+ */
+export async function setComposeMode(userId: string, mode: "post" | null): Promise<void> {
+  await db
+    .update(telegramLinks)
+    .set({ composeMode: mode, updatedAt: new Date() })
     .where(eq(telegramLinks.userId, userId))
 }

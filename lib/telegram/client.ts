@@ -89,6 +89,43 @@ export async function answerCallbackQuery(
   }
 }
 
+/**
+ * Updates only the inline keyboard of an existing message — used to
+ * toggle a Like/Repost/Save button's label in place (e.g. "❤️ Like"
+ * -> "💔 Unlike") right after the callback that triggered it,
+ * instead of sending a new message for every tap.
+ */
+export async function editMessageReplyMarkup(
+  botToken: string,
+  chatId: string,
+  messageId: number,
+  replyMarkup: { inline_keyboard: TelegramInlineKeyboardButton[][] },
+): Promise<void> {
+  try {
+    await callTelegramApi(botToken, "editMessageReplyMarkup", {
+      chat_id: chatId,
+      message_id: messageId,
+      reply_markup: replyMarkup,
+    })
+  } catch (error) {
+    // Non-fatal: Telegram returns an error if the markup is unchanged
+    // (e.g. a double-tap) or the message is too old to edit — the
+    // action itself (like/repost/...) already succeeded regardless.
+    logActionError("telegramEditMessageReplyMarkup", error, { chatId })
+  }
+}
+
+export type TelegramBotCommand = { command: string; description: string }
+
+/** Registers the "/" command-autocomplete menu shown by Telegram clients. */
+export async function setMyCommands(botToken: string, commands: TelegramBotCommand[]): Promise<void> {
+  try {
+    await callTelegramApi(botToken, "setMyCommands", { commands })
+  } catch (error) {
+    logActionError("telegramSetMyCommands", error)
+  }
+}
+
 /** Validates a token and returns the bot's own identity — used to validate a BYO token before saving it. */
 export async function getMe(botToken: string): Promise<TelegramMe> {
   return callTelegramApi<TelegramMe>(botToken, "getMe")

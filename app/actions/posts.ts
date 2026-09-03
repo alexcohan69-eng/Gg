@@ -80,6 +80,10 @@ function parseMediaAttachments(formData: FormData): MediaAttachment[] | null {
 export type PostActionResult = {
   success: boolean
   error?: string
+  // Only set on a successful create — lets callers that don't already
+  // have the post in hand (e.g. the Telegram bot) link straight to it
+  // (`/post/<id>`) in their confirmation instead of a bare "✅ Posted.".
+  postId?: string
 }
 
 type PostAttachment = {
@@ -236,7 +240,7 @@ export async function createPostForUser(
   revalidatePath("/profile")
   if (replyToId) revalidatePath(`/post/${replyToId}`)
 
-  return { success: true }
+  return { success: true, postId }
 }
 
 /** Session-authenticated entry point used by the web composer. */

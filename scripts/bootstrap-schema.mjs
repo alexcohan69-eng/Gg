@@ -365,12 +365,16 @@ const statements = [
     "verificationExpiresAt" timestamp,
     "verifiedAt" timestamp,
     "activeConversationId" text,
+    "composeMode" text,
     "createdAt" timestamp not null default now(),
     "updatedAt" timestamp not null default now()
   )`,
   `create unique index async if not exists telegramLinks_userId_uidx on "telegramLinks" ("userId")`,
   `create index async if not exists telegramLinks_chatId_idx on "telegramLinks" ("chatId")`,
   `create unique index async if not exists telegramLinks_webhookSecret_uidx on "telegramLinks" ("webhookSecret")`,
+  // Added after the table already existed in some environments —
+  // CREATE TABLE IF NOT EXISTS above won't backfill a missing column.
+  `alter table "telegramLinks" add column if not exists "composeMode" text`,
 ]
 
 const client = await pool.connect()
