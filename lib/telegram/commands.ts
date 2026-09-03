@@ -330,7 +330,8 @@ async function handlePlainText(ctx: CommandContext, rawText: string, entities: T
   if (ctx.link.composeMode === "post") {
     await setComposeMode(ctx.userId, null)
     const html = telegramTextToPostHtml(rawText, entities ?? [])
-    await reply(ctx, await publishPost(ctx, html))
+    const result = await publishPost(ctx, html)
+    await reply(ctx, result.text, result.opts)
     return
   }
 
